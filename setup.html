@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>on-duty · setup</title>
+<script src="/radar.js?v=2"></script>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -136,6 +137,7 @@ const S = {
     cal_more_h:'Do you look somewhere else while working?', cal_more_p:'Another monitor, a notebook, a second laptop… add it so looking there never counts as scrolling.', cal_add:'Add another place', cal_nomore:'That’s all',
     cal_phone_h:'Now grab your phone', cal_phone_p:'Hold it the way you do when you doomscroll and look at it for a few seconds.', cal_phone_btn:'I’m holding it', cal_phone_skip:'Skip (default sensitivity)',
     cal_rev_h:'Here’s what I learned', cal_zone_line:z=>`${z.name} · head ${z.pitch > 0 ? '+' : ''}${z.pitch}°, turned ${z.yaw > 0 ? '+' : ''}${z.yaw}°`, cal_phone_line:(p,d)=>d.pitch_delta ? `With the phone your head drops about ${p}°, so I’ll flag you at +${d.pitch_delta}°.` : 'Your head barely moves with the phone, so I’ll rely on the phone detector and your gaze.',
+    phone_ok:'Phone detected', phone_wait:'Show me the phone', cal_sep:{good:'Clear difference: I’ll be precise.',weak:'Your head moves only a little with the phone, so I lean on the phone detector and keep the trigger conservative.',none:'Your head doesn’t move with the phone, so I rely on the phone detector and your eyes.'}, cal_phone_never:'I never saw the phone itself: only head and eyes will count.',
     cal_no_phone:'No phone sample: using default sensitivity.', cal_sens:'How strict?', sens:{relaxed:'Relaxed',normal:'Normal',strict:'Strict'}, cal_save:'Save calibration',
     cal_try_h:'Try it', cal_try_p:'Look down at your phone, then back at the screen. The light should follow you.', cal_down:'Looking down', cal_up:'Working', cal_fin:'Done', cal_dash:'Back to the dashboard', cal_discard:'Remove', switch_cam:'Switch camera', cam_none:'No other camera found.',
     err:'Could not save — is the service running?'},
@@ -167,6 +169,7 @@ const S = {
     cal_more_h:'Você olha pra outro lugar enquanto trabalha?', cal_more_p:'Outro monitor, um caderno, um segundo notebook… adicione pra olhar ali nunca contar como rolagem.', cal_add:'Adicionar outro lugar', cal_nomore:'É só isso',
     cal_phone_h:'Agora pegue o celular', cal_phone_p:'Segure do jeito que você segura pra rolar o feed e olhe pra ele por alguns segundos.', cal_phone_btn:'Estou segurando', cal_phone_skip:'Pular (sensibilidade padrão)',
     cal_rev_h:'Foi isso que aprendi', cal_zone_line:z=>`${z.name} · cabeça ${z.pitch > 0 ? '+' : ''}${z.pitch}°, virada ${z.yaw > 0 ? '+' : ''}${z.yaw}°`, cal_phone_line:(p,d)=>d.pitch_delta ? `Com o celular sua cabeça cai uns ${p}°, então aviso a partir de +${d.pitch_delta}°.` : 'Sua cabeça quase não se mexe com o celular, então confio no detector de celular e no olhar.',
+    phone_ok:'Celular detectado', phone_wait:'Mostre o celular', cal_sep:{good:'Diferença clara: vou ser preciso.',weak:'Sua cabeça se mexe pouco com o celular, então confio também no detector de celular e deixo o gatilho conservador.',none:'Sua cabeça não se mexe com o celular, então confio no detector de celular e no olhar.'}, cal_phone_never:'Não vi o celular em si: só cabeça e olhar vão valer.',
     cal_no_phone:'Sem amostra do celular: sensibilidade padrão.', cal_sens:'Quão rigoroso?', sens:{relaxed:'Relaxado',normal:'Normal',strict:'Rigoroso'}, cal_save:'Salvar calibração',
     cal_try_h:'Teste agora', cal_try_p:'Olhe pro celular e depois pra tela. A luz acompanha você.', cal_down:'Olhando pra baixo', cal_up:'Trabalhando', cal_fin:'Pronto', cal_dash:'Voltar ao painel', cal_discard:'Remover', switch_cam:'Trocar de câmera', cam_none:'Não achei outra câmera.',
     err:'Não consegui salvar — o serviço está rodando?'},
@@ -262,7 +265,7 @@ const R = {
     $('von').onclick = async () => { const on = !cfg.voice_on; $('von').classList.toggle('on', on); $('vlab').textContent = on ? t('voice_on') : t('voice_off'); $('vrow').style.display = on ? '' : 'none'; await save({voice_on:on}); }; },
   cam(p) { face('wow');
     p.innerHTML = `<h1>${t('h_cam')}</h1><p class="sub">${t('p_cam')}</p>
-      <div class="cam"><img id="cimg" alt=""><div class="off" id="coff" style="display:none">${t('cam_perm')}</div></div>
+      <div class="cam"><img id="cimg" alt="" src="/stream.mjpg"><div class="off" id="coff" style="display:none">${t('cam_perm')}</div></div>
       <div class="checks"><div class="check" id="k1"><span class="tick">✓</span><div>${t('c_cam')}<small id="k1s"></small></div></div>
       <div class="check" id="k2"><span class="tick">✓</span><div>${t('c_face')}<small id="k2s"></small></div></div>
       <div class="check" id="k3"><span class="tick">✓</span><div>${t('c_phone')}<small id="k3s"></small></div></div></div>
@@ -270,7 +273,7 @@ const R = {
     $('swc').onclick = switchCam;
     $('pd').onclick = async () => { const on = !cfg.phone_detection; $('pd').classList.toggle('on', on); await save({phone_detection:on}); };
     let phoneSeen = false;
-    const poll = async () => { try { const s = await (await fetch('/status')).json(); $('cimg').src = '/frame.jpg?' + Date.now();
+    const poll = async () => { try { const s = await (await fetch('/status')).json();
       const cam = s.camera_ok !== false && s.mode === 'active' && s.face !== undefined; $('coff').style.display = s.camera_ok === false ? 'grid' : 'none';
       const set = (id, ok, txt) => { $(id).classList.toggle('ok', ok); $(id + 's').textContent = txt; };
       set('k1', cam, cam ? t('c_cam_ok') : t('c_cam_no')); set('k2', !!s.face, s.face ? t('c_face_ok') : t('c_face_no'));
@@ -304,8 +307,8 @@ function renderCal(p) {
   const q = new URLSearchParams(location.search).has('calibrate');
   const fin = q ? () => { location.href = '/'; } : () => go(step + 1);
   const finLabel = q ? t('cal_dash') : t('next');
-  const camBox = `<div class="cam"><img id="cimg" alt=""></div>`;
-  const keepCam = () => { const tick = async () => { const i = $('cimg'); if (i) i.src = '/frame.jpg?' + Date.now(); }; tick(); camTimer = setInterval(tick, 500); };
+  const camBox = `<div class="row" style="align-items:flex-start;gap:18px"><div class="cam" style="max-width:340px"><img id="cimg" alt="" src="/stream.mjpg"></div><canvas id="radar"></canvas></div><div class="row" id="pchip" style="margin-top:10px;display:none"></div>`;
+  const keepCam = () => { const rd = Radar($('radar'), {size:230}); const tick = async () => { try { const s = await (await fetch('/status')).json(); rd.set(s); const pc = $('pchip'); if (pc && P === 'phone') { pc.style.display = 'flex'; pc.innerHTML = `<span class="chip ${s.phone ? 'on' : ''}">📱 ${s.phone ? t('phone_ok') : t('phone_wait')}</span>`; } } catch {} }; tick(); camTimer = setInterval(tick, 250); };
   const chipsQ = iss => iss.map(c => `<span class="chip on" style="background:#fbbf24;color:#422006">${t('q')[c]}</span>`).join(' ');
   const P = cs.phase;
   if (P === 'intro') {
@@ -343,7 +346,7 @@ function renderCal(p) {
       const zs = s.cal.zones, ph = s.cal.phone, ref = zs.length ? zs.reduce((a, z) => a + z.pitch, 0) / zs.length : 0, dp = ph ? Math.round(ph.pitch - ref) : 0;
       const derived = ph && dp >= 4 ? {pitch_delta:Math.round(Math.min(20, Math.max(5, dp * .5)) * 10) / 10} : {};
       p.innerHTML = `<h1>${t('cal_rev_h')}</h1><div class="checks" style="max-width:520px">${zs.map((z, i) => `<div class="check ok"><span class="tick">✓</span><div>${t('cal_zone_line')(z)}</div><button class="chip" data-d="${i}" style="margin-left:auto">${t('cal_discard')}</button></div>`).join('')}
-        <div class="check ${ph ? 'ok' : ''}"><span class="tick">${ph ? '✓' : '–'}</span><div>${ph ? t('cal_phone_line')(dp, derived) : t('cal_no_phone')}</div></div></div>
+        <div class="check ${ph ? 'ok' : ''}"><span class="tick">${ph ? '✓' : '–'}</span><div>${ph ? t('cal_phone_line')(dp, derived) : t('cal_no_phone')}${ph ? `<small>${t('cal_sep')[dp >= 12 ? 'good' : dp >= 6 ? 'weak' : 'none']}</small>` : ''}${ph && s.cal.last && s.cal.last.kind === 'phone' && s.cal.last.phone_ratio === 0 ? `<small>${t('cal_phone_never')}</small>` : ''}</div></div></div>
         <div class="field" style="margin-top:18px"><label>${t('cal_sens')}</label><div class="chips">${['relaxed', 'normal', 'strict'].map(k => `<button class="chip ${cs.sens === k ? 'on' : ''}" data-s="${k}">${t('sens')[k]}</button>`).join('')}</div></div>
         <div class="nav"><button class="btn main" id="sv" ${zs.length ? '' : 'disabled'}>${t('cal_save')}</button><button class="btn ghost" id="again">${t('cal_retry')}</button></div>`;
       p.querySelectorAll('[data-s]').forEach(b => b.onclick = () => { cs.sens = b.dataset.s; p.querySelectorAll('[data-s]').forEach(x => x.classList.toggle('on', x === b)); });

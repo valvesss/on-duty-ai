@@ -36,7 +36,7 @@ class Thresholds(unittest.TestCase):
     def test_half_way_to_the_phone(self):
         t = c.derive_thresholds(self.zones, {"pitch": 23, "gaze": 0.55})
         self.assertEqual(t["pitch_delta"], 10.0)
-        self.assertEqual(t["gaze_delta"], 0.15)
+        self.assertEqual(t["gaze_delta"], c.GAZE_FLOOR)  # 0.15 measured, lifted to the jitter floor
 
     def test_sensitivity_scales(self):
         phone = {"pitch": 23, "gaze": 0.55}
@@ -45,7 +45,8 @@ class Thresholds(unittest.TestCase):
 
     def test_clamped(self):
         self.assertEqual(c.derive_thresholds(self.zones, {"pitch": 80, "gaze": 0.3})["pitch_delta"], 20.0)
-        self.assertEqual(c.derive_thresholds(self.zones, {"pitch": 8, "gaze": 0.3})["pitch_delta"], 5.0)
+        self.assertEqual(c.derive_thresholds(self.zones, {"pitch": 8, "gaze": 0.3})["pitch_delta"], c.PITCH_FLOOR)
+        self.assertEqual(c.derive_thresholds(self.zones, {"pitch": 20, "gaze": 0.31})["gaze_delta"], c.GAZE_FLOOR)
 
     def test_no_clear_signal_keeps_defaults(self):
         self.assertEqual(c.derive_thresholds(self.zones, {"pitch": 4, "gaze": 0.26}), {})
@@ -138,6 +139,66 @@ class Capture(unittest.TestCase):
         t = c.derive_thresholds([{**zr["summary"], "name": "main"}], pr["summary"], "normal")
         self.assertAlmostEqual(t["pitch_delta"], 10.0, delta=0.6)
         self.assertGreater(t["gaze_delta"], 0.1)
+
+
+class Detection(unittest.TestCase):
+    def test_head_drop_triggers(self):
+        self.assertTrue(c.is_face_down(14, 0.0, 12, 0.25, False))
+        self.assertFalse(c.is_face_down(5, 0.0, 12, 0.25, False))
+
+    def test_gaze_alone_needs_to_be_strong(self):
+        self.assertFalse(c.is_face_down(0, 0.3, 12, 0.25, False))   # noisy eyes alone: no
+        self.assertTrue(c.is_face_down(0, 0.5, 12, 0.25, False))    # very strongly down: yes
+        self.assertTrue(c.is_face_down(7, 0.3, 12, 0.25, False))    # eyes down + head part-way: yes
+
+    def test_turned_head_never_counts(self):
+        self.assertFalse(c.is_face_down(30, 0.9, 12, 0.25, True))
+        self.assertTrue(c.turned_away(40, 5))
+        self.assertFalse(c.turned_away(10, 5))
+
+    def test_noise_floor_lifts_the_threshold(self):
+        noisy = [((i * 7) % 25) - 12.0 for i in range(100)]
+        self.assertGreater(c.noise_floor(noisy), 10)
+        self.assertEqual(c.noise_floor([0.0] * 10), 0.0)  # not enough data yet
+        th = c.effective_thresholds({"pitch_delta": 5, "gaze_delta": 0.14}, {}, {}, c.noise_floor(noisy), True)
+        self.assertGreaterEqual(th["pitch_delta"], c.noise_floor(noisy))
+
+    def test_uncalibrated_is_calmer(self):
+        a = c.effective_thresholds({"pitch_delta": 12, "gaze_delta": 0.25}, {}, {}, 0, True)
+        b = c.effective_thresholds({"pitch_delta": 12, "gaze_delta": 0.25}, {}, {}, 0, False)
+        self.assertGreater(b["pitch_delta"], a["pitch_delta"])
+
+    def test_feedback_nudges_and_clamps(self):
+        t = {}
+        for _ in range(20):
+            t = c.adjust_tuning(t, "false_positive")
+        self.assertEqual(t["pitch"], 12.0)
+        for _ in range(20):
+            t = c.adjust_tuning(t, "missed")
+        self.assertEqual(t["pitch"], -4.0)
+
+    def test_separation_verdict(self):
+        z = [{"pitch": -10, "gaze": 0.4}]
+        self.assertEqual(c.separation(z, {"pitch": 8})["verdict"], "good")
+        self.assertEqual(c.separation(z, {"pitch": -2})["verdict"], "weak")
+        self.assertEqual(c.separation(z, {"pitch": -9})["verdict"], "none")
+
+    def test_smoother_kills_single_flips(self):
+        s = c.Smoother(3)
+        s.push((0.0, 0.0, 0.3))
+        s.push((1.0, 0.0, 0.3))
+        out = s.push((40.0, 0.0, 0.3))  # one-frame flip
+        self.assertEqual(out[0], 1.0)
+        self.assertIsNone(s.push(None))
+
+
+class PhoneRatio(unittest.TestCase):
+    def test_phone_ratio_reported(self):
+        s = c.CaptureSession("phone", "phone", 8, 0.0)
+        for i in range(20):
+            s.add((20.0, 0.0, 0.6), 120.0, 0.3, 0.5, phone=(i % 2 == 0))
+        self.assertEqual(s.result()["phone_ratio"], 0.5)
+        self.assertTrue(s.live(1.0)["phone_seen"])
 
 
 if __name__ == "__main__":

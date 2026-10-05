@@ -72,6 +72,7 @@ flowchart LR
 
 - **Your posture is the baseline.** Head pitch and eye gaze are measured *relative to how you sit while typing*, so camera angle doesn't matter.
 - **Phone in frame** (YOLO11n, COCO "cell phone") is an instant signal. It needs Apple Silicon; on Intel the face signal still works.
+- **It's built to avoid false alarms.** Decisions use a smoothed pose (a one-frame flip is ignored); eyes alone only count when strongly down; turning your head to another monitor is "looking away", not "down"; and the trigger never sits below your own natural jitter (it's measured while you type and raised automatically).
 - **Only typing ends it.** Once it starts, it keeps talking — five levels, gentle → sarcastic → firm → drama → chaos — until you touch the keyboard or mouse again.
 
 ### When it sleeps
@@ -92,10 +93,10 @@ The dashboard shows each state (and when it's back) instead of going blank.
 Open <http://localhost:4269> and keep it on a second monitor.
 
 - **Live speech bubble** — each line appears as it's spoken.
-- **Polaroid** with your camera frame (there's a blur button), a stamp and a running clock.
+- **Smooth live camera** (~20 fps; detection runs separately at its own pace) in a polaroid, with a blur button, a stamp and a running clock.
 - **📸 Snap** — builds the shareable card; download, copy, or share. Level 4–5 lines make the button pulse: those are the ones worth posting.
 - **Hall of shame** — today's heaviest lines, one tap each from becoming a card.
-- History charts, focus streak, and a collapsible panel with the raw signals.
+- History charts, focus streak, and a collapsible panel with the raw signals and the live head-pose radar.
 - **⚙** reopens the wizard any time; **⏸** pauses for an hour or until tomorrow.
 
 ## Personalize the lines
@@ -115,7 +116,7 @@ on-duty works out of the box by learning your posture while you type. For a roun
 
 1. **Where you look while working** — main screen, second monitor, keyboard/notes, laptop screen. Each place is a *zone* with its own baseline, so glancing at the other monitor never counts as scrolling.
 2. **How you look at your phone** — I measure how far your head and eyes drop, and set the trigger half-way between "working" and "phone", scaled by *Relaxed / Normal / Strict*.
-3. **Try it** — a live light shows what I'd flag, before you save.
+3. **Try it** — a live radar shows you (the dot), your zones (green) and where I'd nag (red band), before you save.
 
 While you capture, you get live hints (too dark, too far, off-center, moving) and bad captures are rejected instead of saved.
 
@@ -130,6 +131,10 @@ While you capture, you get live hints (too dark, too far, off-center, moving) an
 | Dark room, camera covered | A "can't see you" banner instead of silent misses. |
 
 Each setup keeps its own saved calibration in `~/.on-duty/on-duty.db`.
+
+### Teach it when it's wrong
+
+Two buttons keep it honest. **🙅 I wasn't on my phone** (on the stage while it nags) stops the nag, pauses it for a minute and makes the trigger more relaxed; **📱 You missed one** (in the dashboard's details) makes it stricter. The adjustment is saved per setup and reset when you recalibrate.
 
 ## Commands
 
