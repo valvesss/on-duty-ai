@@ -24,7 +24,8 @@ DEFAULTS = {
     "voice": "",              # empty = default voice for the language (see VOICES)
     "voice_on": True,         # false = notifications + dashboard only
     "tone": "balanced",       # friendly | balanced | ruthless | chaos
-    "port": 7878,             # dashboard at http://localhost:<port>
+    "port": 4269,             # dashboard at http://localhost:<port>
+    "retention_days": 365,    # events older than this are deleted at startup (0 = keep forever)
     "camera": 0,
     "phone_detection": True,  # YOLO11n "cell phone" detector (Apple Silicon recommended)
     "custom_phrases_only": False,  # true = use only ~/.on-duty/phrases.json, false = mix with built-ins
@@ -51,6 +52,8 @@ def merge(user: dict) -> dict:
     cfg = {**DEFAULTS, **user}
     cfg["thresholds"] = {**DEFAULTS["thresholds"], **user.get("thresholds", {})}
     cfg["schedule"] = {**DEFAULTS["schedule"], **user.get("schedule", {})}
+    if cfg["port"] == 7878:  # the default of early builds
+        cfg["port"] = DEFAULTS["port"]
     if cfg["tone"] not in TONES:
         cfg["tone"] = "balanced"
     if cfg["lang"] not in VOICES:

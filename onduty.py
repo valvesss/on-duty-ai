@@ -68,6 +68,15 @@ exec "{DIR}/.venv/bin/python" "{DIR}/on_duty.py" --debug >> "{LOG}" 2>&1
     sh("codesign", "--force", "-s", "-", str(APP), check=True)
 
 
+def unload() -> None:
+    """launchctl bootout is asynchronous: wait until the job is really gone before bootstrapping again."""
+    sh("launchctl", "bootout", f"gui/{UID}/{LABEL}", stderr=subprocess.DEVNULL)
+    for _ in range(40):
+        if sh("launchctl", "print", f"gui/{UID}/{LABEL}", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
+            return
+        time.sleep(0.25)
+
+
 def cmd_install(_a) -> None:
     sh("uv", "sync", "-q", cwd=DIR, check=True)
     download_models()
@@ -88,7 +97,7 @@ def cmd_install(_a) -> None:
     if legacy.exists():
         sh("launchctl", "bootout", f"gui/{UID}/com.valvesss.onduty", stderr=subprocess.DEVNULL)
         legacy.unlink()
-    sh("launchctl", "bootout", f"gui/{UID}/{LABEL}", stderr=subprocess.DEVNULL)
+    unload()
     sh("pkill", "-f", f"{DIR}/on_duty.py")  # bootout doesn't always take down the app `open` launched
     sh("launchctl", "bootstrap", f"gui/{UID}", str(PLIST), check=True)
     cfg = config.load()
@@ -118,7 +127,7 @@ def cmd_start(_a) -> None:
 
 
 def cmd_stop(_a) -> None:
-    sh("launchctl", "bootout", f"gui/{UID}/{LABEL}", stderr=subprocess.DEVNULL)
+    unload()
     sh("pkill", "-f", f"{DIR}/on_duty.py")
     print("stopped (back at next login; ./onduty start to resume now)")
 

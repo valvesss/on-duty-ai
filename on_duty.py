@@ -89,6 +89,7 @@ def validate_config(new: dict) -> dict:
     times = [sch["start"], sch["end"], *[t for b in sch["breaks"] for t in b]]
     if not all(isinstance(t, str) and HHMM.match(t) for t in times):
         raise ValueError("times must be HH:MM")
+    cfg["retention_days"] = max(0, int(cfg["retention_days"]))
     sch["days"] = sorted({int(d) for d in sch["days"] if 1 <= int(d) <= 7})
     cfg["port"], cfg["camera"] = CFG["port"], CFG["camera"]  # needs a restart; not editable from the page
     return cfg
@@ -343,6 +344,8 @@ def main() -> None:
     a = p.parse_args()
     CFG.update(config.load())
     th = CFG["thresholds"]
+    if (gone := db.prune(CFG["retention_days"])):
+        log(f"retention: removed {gone} events older than {CFG['retention_days']} days")
 
     lm = vision.FaceLandmarker.create_from_options(vision.FaceLandmarkerOptions(
         base_options=BaseOptions(model_asset_path=str(FACE_MODEL)),

@@ -37,7 +37,7 @@ the person, the funnier the lines (and the more likely they screenshot the dashb
 
 ## 3. Check
 
-`./onduty phrases validate`, then `./onduty restart`, then open <http://localhost:7878> and press
+`./onduty phrases validate`, then `./onduty restart`, then open <http://localhost:4269> and press
 **Test alert** so the user sees the line appear live. Offer to adjust the tone.
 
 Built-in lines are mixed in by default; set `"custom_phrases_only": true` in the config to use only yours.

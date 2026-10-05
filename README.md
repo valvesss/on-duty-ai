@@ -88,7 +88,7 @@ The dashboard shows each state (and when it's back) instead of going blank.
 
 ## The dashboard
 
-Open <http://localhost:7878> and keep it on a second monitor.
+Open <http://localhost:4269> and keep it on a second monitor.
 
 - **Live speech bubble** — each line appears as it's spoken.
 - **Polaroid** with your camera frame (there's a blur button), a stamp and a running clock.
@@ -133,10 +133,12 @@ Everything lives in `~/.on-duty/config.json` and is editable from the wizard.
 | `voice` / `voice_on` | default / `true` | Any macOS voice; off = notifications and dashboard only |
 | `schedule` | Mon–Fri 09:00–18:00, break 12:00–13:30 | `"enforce": false` = always on |
 | `phone_detection` | `true` | The YOLO phone detector |
+| `retention_days` | `365` | Events older than this are deleted at startup (`0` = keep forever) |
+| `port` | `4269` | Dashboard at `http://localhost:<port>` (restart after changing) |
 | `custom_phrases_only` | `false` | Use only your `phrases.json` instead of mixing with the built-ins |
 | `thresholds` | see [`config.py`](config.py) | Head/gaze sensitivity, idle seconds, YOLO confidence |
 
-Your data (events and posture calibration) stays in `~/.on-duty/on-duty.db`, a plain SQLite file.
+Your data (events and posture calibration) stays in `~/.on-duty/on-duty.db`, a plain SQLite file. Its schema is versioned (`PRAGMA user_version`) and upgrades itself on start.
 
 ## Troubleshooting
 
