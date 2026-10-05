@@ -21,6 +21,12 @@
   header h1 { margin:0; font-size:20px; letter-spacing:-.02em }
   .pill { font-size:12px; font-weight:700; padding:4px 10px; border-radius:99px; color:#fff; background:var(--mute); text-transform:uppercase; letter-spacing:.04em }
   header .sp { flex:1 }
+  .gear { text-decoration:none; color:var(--fg); border:1px solid var(--line); background:var(--card); border-radius:99px; padding:6px 12px; font-size:17px; line-height:1.2 }
+  .menuwrap { position:relative } .menu { position:absolute; right:0; top:110%; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:6px; display:none; z-index:30; box-shadow:0 10px 30px #0004; min-width:170px }
+  .menu.on { display:grid; gap:4px } .menu button { border:0; text-align:left; border-radius:10px }
+  .polaroid.sleepy img { opacity:0 } .polaroid .zz { position:absolute; left:12px; right:12px; top:12px; aspect-ratio:4/3; display:none; place-items:center; font-size:72px; background:#16162a; border-radius:2px }
+  .polaroid.sleepy .zz { display:grid }
+  .mascot.asleep .lid { transform:scaleY(1) !important; animation:none !important }
   #photo { background:linear-gradient(135deg,var(--c1),var(--c2)); color:#fff; border:0; font-weight:700 }
   #photo.hot { animation:pulse 1s infinite }
   @keyframes pulse { 50% { transform:scale(1.08); box-shadow:0 0 0 8px #ff3b3033 } }
@@ -130,12 +136,14 @@
 <main>
   <header>
     <img src="/logo.svg" alt="" class="logo"><h1>on-duty</h1><span class="pill" id="pill">…</span><span class="sp"></span>
-    <button id="blur" data-i="blur"></button><button id="test" data-i="test"></button><button id="photo" data-i="photo"></button>
+    <button id="blur" data-i="blur"></button><button id="test" data-i="test"></button>
+    <span class="menuwrap"><button id="pause"></button><div class="menu" id="pmenu"><button data-m="60" data-i="p1h"></button><button data-m="tomorrow" data-i="ptom"></button></div></span>
+    <a href="/setup?edit" class="gear" title="Settings" aria-label="Settings">⚙</a><button id="photo" data-i="photo"></button>
   </header>
 
   <section class="stage" id="stage">
     <div class="polaroid" id="polaroid">
-      <img id="cam" alt="">
+      <img id="cam" alt=""><div class="zz">💤</div>
       <div class="stamp" id="stamp"></div>
       <div class="cap"><span id="capName"></span><span id="capTime"></span></div>
     </div>
@@ -206,11 +214,11 @@ const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).
 const fmt = (v, d=1) => v == null ? '–' : (v > 0 ? '+' : '') + v.toFixed(d);
 const PAL = [  // 0 = back, 1..5 = nag level
   ['#0f766e', '#22c55e'], ['#d97706', '#f59e0b'], ['#ea580c', '#f97316'], ['#dc2626', '#f43f5e'], ['#9d174d', '#7e22ce'], ['#111113', '#e11d48']];
-const WORK = ['#0f766e', '#2563eb'], WATCH = ['#b45309', '#f59e0b'], CALIB = ['#334155', '#64748b'], AWAY = ['#3f3f46', '#71717a'];
+const SLEEP = ['#1e1b4b', '#3730a3'], WORK = ['#0f766e', '#2563eb'], WATCH = ['#b45309', '#f59e0b'], CALIB = ['#334155', '#64748b'], AWAY = ['#3f3f46', '#71717a'];
 
 const STR = {
   pt_BR: {
-    blur:'Borrar câmera', unblur:'Mostrar câmera', test:'Testar alerta', photo:'📸 Tirar foto', download:'Baixar', copy:'Copiar', share:'Compartilhar', close:'Fechar',
+    pause:'⏸ Pausar', resume:'▶ Retomar', p1h:'Por 1 hora', ptom:'Até amanhã', blur:'Borrar câmera', unblur:'Mostrar câmera', test:'Testar alerta', photo:'📸 Tirar foto', download:'Baixar', copy:'Copiar', share:'Compartilhar', close:'Fechar',
     head:'Cabeça vs. seu normal', gaze:'Olhar pra baixo vs. normal', downwin:'Olhando pra baixo (janela)', idlelbl:'Sem teclado/mouse', phonelbl:'Celular na câmera (YOLO)',
     lg_head:'cabeça (°)', lg_gaze:'olhar ×40', lg_down:'pra baixo', lg_phone:'celular visto', signals:'Sinais e detalhes', events:'Eventos',
     chart_hint:'últimos 2 min · linha tracejada = limiar da cabeça',
@@ -221,6 +229,8 @@ const STR = {
     st_calib:'calibrando', st_phone:'no celular', st_seen:'celular à vista', st_down:'olhando pra baixo', st_away:'sem rosto', st_work:'trabalhando',
     idle_work:n=>`Tô de olho${n ? ', ' + n : ''}. 👀`, idle_calib:'Digita um pouquinho que eu aprendo sua postura.', idle_seen:'Eu vi esse celular aí…', idle_down:'Olhando pra baixo, hein…', idle_away:'Cadê você? Não tô te vendo.',
     stamp_phone:'NO CELULAR', stamp_work:'EM SERVIÇO', stamp_seen:'SUSPEITO', stamp_away:'AUSENTE', stamp_calib:'CALIBRANDO',
+    sl_asleep:'Tela dormindo. Eu também. 💤', sl_day:t=>`Folga! Volto ${t}.`, sl_hours:t=>`Fora do expediente. Volto ${t}.`, sl_break:t=>`Pausa! Volto ${t}.`, sl_paused:t=>`Pausado até ${t}.`, sl_away:'Cadê todo mundo? Durmo até você mexer no Mac. 💤',
+    stamp_sleep:'DORMINDO', stamp_off:'FORA DO EXPEDIENTE', stamp_pause:'PAUSADO', clock_back:'volto em', pill_asleep:'dormindo', pill_off:'fora do expediente', pill_paused:'pausado', pill_away:'ausente',
     clock_phone:'no celular há', clock_free:'sem celular há', lvl:['gentil','sarcástico','cobrança','drama','caos'], lvl_of:l=>`nível ${l}/5`,
     back_meta:m=>`voltou depois de ${m}`, test_meta:'teste', toast_photo:'Essa merece uma foto 📸', toast_copied:'Copiado! Cola no story 😈', toast_saved:'Salvo!', toast_nocopy:'Seu navegador não deixou copiar — baixa a imagem.',
     alert_above:v=>`alerta acima de +${v}°`, gaze_above:v=>`alerta acima de +${v}`, off:'desligado', visible:'📱 visível agora', no:'não',
@@ -228,7 +238,7 @@ const STR = {
     none_yet:'nada ainda', via_phone:n=>`${n} via 📱`, sec:'s', min:'min', h:'h',
     card_caught:'PEGO NO FLAGRA', card_back:'DE VOLTA AO JOGO', card_on:m=>`${m} no celular`, card_stamp:'NO CELULAR', card_stamp_back:'REABILITADO', card_foot:'on-duty · github.com/valvesss/on-duty-ai'},
   en_US: {
-    blur:'Blur camera', unblur:'Show camera', test:'Test alert', photo:'📸 Snap', download:'Download', copy:'Copy', share:'Share', close:'Close',
+    pause:'⏸ Pause', resume:'▶ Resume', p1h:'For 1 hour', ptom:'Until tomorrow', blur:'Blur camera', unblur:'Show camera', test:'Test alert', photo:'📸 Snap', download:'Download', copy:'Copy', share:'Share', close:'Close',
     head:'Head vs. your normal', gaze:'Looking down vs. normal', downwin:'Looking down (window)', idlelbl:'No keyboard/mouse', phonelbl:'Phone in camera (YOLO)',
     lg_head:'head (°)', lg_gaze:'gaze ×40', lg_down:'looking down', lg_phone:'phone seen', signals:'Signals & details', events:'Events',
     chart_hint:'last 2 min · dashed line = head threshold',
@@ -239,6 +249,8 @@ const STR = {
     st_calib:'calibrating', st_phone:'on phone', st_seen:'phone in view', st_down:'looking down', st_away:'no face', st_work:'working',
     idle_work:n=>`Watching you${n ? ', ' + n : ''}. 👀`, idle_calib:'Type a little so I can learn your posture.', idle_seen:'I saw that phone…', idle_down:'Looking down, huh…', idle_away:"Where are you? I can't see you.",
     stamp_phone:'ON PHONE', stamp_work:'ON DUTY', stamp_seen:'SUSPICIOUS', stamp_away:'AWAY', stamp_calib:'CALIBRATING',
+    sl_asleep:'Screen asleep. So am I. 💤', sl_day:t=>`Day off! Back ${t}.`, sl_hours:t=>`Off the clock. Back ${t}.`, sl_break:t=>`Break time! Back ${t}.`, sl_paused:t=>`Paused until ${t}.`, sl_away:'Nobody here? I sleep until you touch the Mac. 💤',
+    stamp_sleep:'SLEEPING', stamp_off:'OFF DUTY', stamp_pause:'PAUSED', clock_back:'back in', pill_asleep:'asleep', pill_off:'off duty', pill_paused:'paused', pill_away:'away',
     clock_phone:'on the phone for', clock_free:'phone-free for', lvl:['gentle','sarcastic','firm','drama','chaos'], lvl_of:l=>`level ${l}/5`,
     back_meta:m=>`back after ${m}`, test_meta:'test', toast_photo:'This one deserves a photo 📸', toast_copied:'Copied! Paste it in your story 😈', toast_saved:'Saved!', toast_nocopy:"Your browser wouldn't copy — download the image.",
     alert_above:v=>`alert above +${v}°`, gaze_above:v=>`alert above +${v}`, off:'off', visible:'📱 visible now', no:'no',
@@ -259,6 +271,10 @@ const clockFmt = ms => { const s = Math.max(0, Math.floor(ms / 1000)), h = Math.
 
 $('test').onclick = () => fetch('/test', {method:'POST'});
 $('blur').onclick = () => fetch('/blur', {method:'POST'});
+const post = (path, body) => fetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body || {})});
+$('pause').onclick = () => { if ($('pause').dataset.paused) post('/api/pause', {minutes:0}); else $('pmenu').classList.toggle('on'); };
+document.querySelectorAll('#pmenu button').forEach(b => b.onclick = () => { post('/api/pause', {minutes:b.dataset.m === 'tomorrow' ? 'tomorrow' : +b.dataset.m}); $('pmenu').classList.remove('on'); });
+addEventListener('click', e => { if (!e.target.closest('.menuwrap')) $('pmenu').classList.remove('on'); });
 
 /* ---------- toast + fx ---------- */
 let toastT;
@@ -290,14 +306,14 @@ const FACE = { // pupil dx,dy · brow angle (deg) · brow dy · mouth path
   work:  [0, -2, 0, 0, 'M75 110 Q100 126 125 110'], calib: [0, 0, 0, 0, 'M80 112 L120 112'], away: [0, 0, 8, 4, 'M80 114 Q100 108 120 114'],
   seen:  [0, 10, 12, -4, 'M78 114 L122 114'], 1: [0, 14, 10, -2, 'M78 114 Q100 108 122 114'], 2: [0, 16, 16, 0, 'M76 116 Q100 106 124 116'],
   3:     [0, 18, 24, 2, 'M72 118 Q100 100 128 118'], 4: [0, 20, 32, 4, 'M76 108 Q100 142 124 108 Z'], 5: [0, 22, 40, 6, 'M70 106 Q100 150 130 106 Z'],
-  back:  [0, -2, -8, -4, 'M70 108 Q100 134 130 108'],
+  back:  [0, -2, -8, -4, 'M70 108 Q100 134 130 108'], sleep: [0, 0, 0, 2, 'M86 114 Q100 120 114 114'],
 };
 function face(key) {
   const [dx, dy, ang, bdy, mouth] = FACE[key] || FACE.work;
   for (const id of ['pupL', 'pupR']) $(id).style.transform = `translate(${dx}px,${dy}px)`;
   $('browL').style.transform = `translateY(${bdy}px) rotate(${ang}deg)`; $('browR').style.transform = `translateY(${bdy}px) rotate(${-ang}deg)`;
   $('mouth').setAttribute('d', mouth);
-  $('mascot').classList.toggle('idle', key === 'work' || key === 'calib');
+  $('mascot').classList.toggle('idle', key === 'work' || key === 'calib'); $('mascot').classList.toggle('asleep', key === 'sleep');
 }
 let cur = {key:null, lvl:-1};
 function setStage(key, lvl, pal) {
@@ -334,7 +350,7 @@ function onSaid(s) {
   lastLine = null; typeLine(d.text, meta);
   grabFrame().then(img => { moment = {img, text:d.text, level:d.kind === 'back' ? 0 : d.level, kind:d.kind, minutes:d.minutes, t:d.t}; });
   if (d.kind === 'back') { confetti(); if (d.minutes >= 1) setTimeout(() => toast(L.toast_photo), 1200); }
-  if (d.kind !== 'back' && d.level >= 4) { $('photo').classList.add('hot'); toast(L.toast_photo); }
+  if (!first && d.kind !== 'back' && d.level >= 4) { $('photo').classList.add('hot'); toast(L.toast_photo); }
 }
 
 async function tick() {
@@ -345,17 +361,25 @@ async function tick() {
     const now = Date.now(), demo = !s.scrolling && s.said && s.said.kind === 'test' && now / 1000 - s.said.t < 9;
     const lvl = demo ? s.said.level : s.scrolling ? Math.max(1, s.level) : 0;
     let key, pal, st, stamp, stampc, idle;
-    if (!s.calibrated) { key = 'calib'; pal = CALIB; st = [L.st_calib, '--warn']; stamp = L.stamp_calib; stampc = '#64748b'; idle = L.idle_calib; }
+    const sleepy = s.mode && s.mode !== 'active';
+    const at = s.resume_at ? new Date(s.resume_at * 1000).toLocaleString(loc(), {weekday: new Date(s.resume_at * 1000).toDateString() === new Date().toDateString() ? undefined : 'short', hour:'2-digit', minute:'2-digit'}) : '';
+    if (sleepy) { key = 'sleep'; pal = SLEEP; stampc = '#6366f1';
+      const M = {asleep:[L.pill_asleep, L.stamp_sleep, L.sl_asleep], away:[L.pill_away, L.stamp_sleep, L.sl_away], paused:[L.pill_paused, L.stamp_pause, L.sl_paused(at)],
+        offduty:[L.pill_off, L.stamp_off, s.mode_why === 'break' ? L.sl_break(at) : s.mode_why === 'day' ? L.sl_day(at) : L.sl_hours(at)]}[s.mode] || [s.mode, s.mode, ''];
+      st = [M[0], '--mute']; stamp = M[1]; idle = M[2]; }
+    else if (!s.calibrated) { key = 'calib'; pal = CALIB; st = [L.st_calib, '--warn']; stamp = L.stamp_calib; stampc = '#64748b'; idle = L.idle_calib; }
     else if (s.scrolling || demo) { key = lvl; pal = PAL[lvl]; st = [L.st_phone, '--bad']; stamp = L.stamp_phone; stampc = '#dc2626'; }
     else if (s.phone) { key = 'seen'; pal = WATCH; st = [L.st_seen, '--warn']; stamp = L.stamp_seen; stampc = '#d97706'; idle = L.idle_seen; }
     else if (s.down) { key = 'seen'; pal = WATCH; st = [L.st_down, '--warn']; stamp = L.stamp_seen; stampc = '#d97706'; idle = L.idle_down; }
     else if (!s.face) { key = 'away'; pal = AWAY; st = [L.st_away, '--mute']; stamp = L.stamp_away; stampc = '#71717a'; idle = L.idle_away; }
     else { key = 'work'; pal = WORK; st = [L.st_work, '--ok']; stamp = L.stamp_work; stampc = '#16a34a'; idle = L.idle_work(NAME); }
-    const recent = s.said && now / 1000 - s.said.t < 30 && s.said.kind !== 'test' || s.said && now / 1000 - s.said.t < 12;
+    const recent = !sleepy && s.said && now / 1000 - s.said.t < 30 && s.said.kind !== 'test' || s.said && now / 1000 - s.said.t < 12;
     if (s.said && s.said.kind === 'back' && now / 1000 - s.said.t < 20 && !s.scrolling) { key = 'back'; pal = PAL[0]; }
     setStage(key, lvl, pal);
+    $('polaroid').classList.toggle('sleepy', !!sleepy);
+    $('pause').textContent = s.mode === 'paused' ? L.resume : L.pause; $('pause').dataset.paused = s.mode === 'paused' ? 1 : '';
     onSaid(s);
-    if (!recent && !s.scrolling && !demo) showStatic(idle || L.idle_work(NAME));
+    if (sleepy || (!recent && !s.scrolling && !demo)) showStatic(idle || L.idle_work(NAME));
     $('pill').textContent = st[0]; $('pill').style.background = css(st[1]);
     const stp = $('stamp'); if (stp.textContent !== stamp) { stp.textContent = stamp; stp.classList.remove('bad'); void stp.offsetWidth; if (s.scrolling) stp.classList.add('bad'); }
     stp.style.setProperty('--stampc', stampc);
@@ -363,8 +387,10 @@ async function tick() {
     document.querySelectorAll('#pips i').forEach((p, i) => p.classList.toggle('on', i < lvl));
     $('lvname').textContent = lvl ? `${L.lvl_of(lvl)} · ${L.lvl[lvl - 1]}` : '';
     // clock
-    if (s.scrolling) {
-      const want = now - s.phone_min * 60000; if (!phoneStart || Math.abs(phoneStart - want) > 8000) phoneStart = want;
+    if (sleepy) { phoneStart = 0; document.title = 'on-duty 💤';
+      if (s.resume_at) { $('clockLbl').textContent = L.clock_back; $('clock').textContent = clockFmt(s.resume_at * 1000 - now); } else { $('clockLbl').textContent = ''; $('clock').textContent = ''; }
+    } else if (s.scrolling || demo) {
+      const want = demo ? s.said.t * 1000 - s.said.minutes * 60000 : now - s.phone_min * 60000; if (!phoneStart || Math.abs(phoneStart - want) > 8000) phoneStart = want;
       $('clockLbl').textContent = L.clock_phone; $('clock').textContent = clockFmt(now - phoneStart);
       document.title = `📵 ${clockFmt(now - phoneStart)} · on-duty`;
     } else {
@@ -460,11 +486,13 @@ async function drawCard(m) {
   g.save(); g.globalAlpha = .12; g.strokeStyle = '#fff'; g.lineWidth = 2;
   for (let i = -H; i < W; i += 26) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i + H, H); g.stroke(); } g.restore();
   const rg = g.createRadialGradient(W * .75, 150, 20, W * .75, 150, 700); rg.addColorStop(0, '#ffffff55'); rg.addColorStop(1, '#fff0'); g.fillStyle = rg; g.fillRect(0, 0, W, H);
-  g.fillStyle = '#fff'; g.textBaseline = 'alphabetic'; g.font = '900 60px "Avenir Next",system-ui,sans-serif';
-  g.fillText(back ? L.card_back : L.card_caught, 64, 112);
   const lv = m.level ? L.lvl_of(m.level) + ' · ' + L.lvl[m.level - 1] : '';
-  if (lv) { g.font = '800 30px "Avenir Next",system-ui'; const w = g.measureText(lv.toUpperCase()).width + 44; g.fillStyle = '#0006'; g.beginPath(); g.roundRect(W - 64 - w, 64, w, 56, 28); g.fill();
-    g.fillStyle = '#fff'; g.fillText(lv.toUpperCase(), W - 64 - w + 22, 102); }
+  g.font = '800 30px "Avenir Next",system-ui'; const pw = lv ? g.measureText(lv.toUpperCase()).width + 44 : 0;
+  const title = back ? L.card_back : L.card_caught; let ts = 60;
+  for (; ts > 36; ts -= 2) { g.font = `900 ${ts}px "Avenir Next",system-ui,sans-serif`; if (g.measureText(title).width <= W - 128 - pw - 28) break; }
+  g.fillStyle = '#fff'; g.textBaseline = 'alphabetic'; g.fillText(title, 64, 112);
+  if (lv) { g.font = '800 30px "Avenir Next",system-ui'; g.fillStyle = '#0006'; g.beginPath(); g.roundRect(W - 64 - pw, 64, pw, 56, 28); g.fill();
+    g.fillStyle = '#fff'; g.fillText(lv.toUpperCase(), W - 64 - pw + 22, 102); }
   // polaroid
   g.save(); g.translate(W / 2, 510); g.rotate(-.04); g.scale(.9, .9);
   g.shadowColor = '#0007'; g.shadowBlur = 50; g.shadowOffsetY = 26; g.fillStyle = '#fff'; g.fillRect(-350, -400, 700, 800); g.shadowColor = 'transparent';
@@ -514,6 +542,7 @@ $('cp').onclick = async () => { try { await navigator.clipboard.write([new Clipb
 $('sh').onclick = async () => { const f = new File([cardBlob], 'on-duty.png', {type:'image/png'});
   if (navigator.canShare && navigator.canShare({files:[f]})) navigator.share({files:[f]}).catch(() => {}); else $('dl').click(); };
 
+if (location.search.includes('demo=card')) setTimeout(() => openCard({img:null, text:'Red alert. Alex was last seen scrolling. Rescue team dispatched.', level:4, kind:'nag', minutes:7.5, t:Date.now() / 1000}), 800);
 setLang('pt_BR'); $('line').textContent = L.connecting;
 face('work'); tick(); setInterval(tick, 700); history(); setInterval(history, 10000);
 </script>

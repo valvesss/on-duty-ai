@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>on-duty · setup</title>
+<link rel="icon" href="/logo.svg">
+<style>
+  :root { --c1:#0f766e; --c2:#2563eb; --font:"Avenir Next","SF Pro Rounded",ui-rounded,system-ui,sans-serif; }
+  * { box-sizing:border-box }
+  html, body { height:100% }
+  body { margin:0; font-family:var(--font); color:#fff; background:linear-gradient(135deg,var(--c1),var(--c2)); transition:background 1s; overflow-x:hidden }
+  body::before { content:""; position:fixed; inset:-50%; opacity:.12; pointer-events:none;
+                 background:repeating-linear-gradient(45deg,#fff 0 2px,transparent 2px 24px); animation:drift 24s linear infinite }
+  @keyframes drift { to { transform:translate(48px,48px) } }
+  #app { position:relative; min-height:100%; max-width:980px; margin:0 auto; padding:22px 20px 28px; display:flex; flex-direction:column }
+  .top { display:flex; align-items:center; gap:14px }
+  .top img { width:34px; height:34px }
+  .top b { font-size:18px; letter-spacing:-.02em }
+  .dots { display:flex; gap:8px; margin-left:auto }
+  .dots button { width:12px; height:12px; padding:0; border-radius:50%; border:0; background:#fff5; cursor:pointer; transition:.3s }
+  .dots button.on { background:#fff; width:34px; border-radius:6px }
+  .dots button.done { background:#fffc }
+  .lang { background:#0003; color:#fff; border:0; border-radius:99px; padding:6px 12px; font:700 13px var(--font); cursor:pointer }
+  .stage { flex:1; display:grid; grid-template-columns:minmax(200px,300px) 1fr; gap:40px; align-items:center; padding:20px 0 }
+  @media (max-width: 760px) { .stage { grid-template-columns:1fr; gap:10px } .mascot { width:150px !important } }
+  .mascot { width:280px; filter:drop-shadow(0 14px 24px #0005); justify-self:center; transition:transform .5s }
+  .mascot.bounce { animation:bounce .6s }
+  @keyframes bounce { 30% { transform:translateY(-18px) rotate(-3deg) } 60% { transform:translateY(0) } }
+  .pupil { transition:transform .12s }
+  .brow { transform-box:fill-box; transform-origin:center; transition:transform .35s }
+  .lid { transform-box:fill-box; transform-origin:top; transform:scaleY(0) }
+  .blink .lid { animation:blink 4s infinite }
+  @keyframes blink { 0%,94%,100% { transform:scaleY(0) } 97% { transform:scaleY(1) } }
+  .panel { animation:in .45s cubic-bezier(.2,.9,.3,1) }
+  @keyframes in { from { opacity:0; transform:translateY(22px) } }
+  h1 { font-size:clamp(32px,5.2vw,56px); line-height:1.04; margin:0 0 14px; letter-spacing:-.035em; font-weight:800 }
+  p.sub { font-size:19px; line-height:1.45; margin:0 0 26px; opacity:.92; max-width:560px }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center }
+  input[type=text], input[type=time], select {
+    font:700 28px var(--font); color:#17171a; background:#fff; border:0; border-radius:18px; padding:16px 20px; outline:none; width:100%; max-width:480px;
+    box-shadow:0 10px 30px #0004 }
+  input[type=time] { font-size:22px; width:auto; padding:12px 16px }
+  select { font-size:20px; appearance:none }
+  .btn { font:800 18px var(--font); border:0; border-radius:99px; padding:15px 28px; cursor:pointer; transition:transform .12s, box-shadow .12s }
+  .btn:hover { transform:translateY(-2px); box-shadow:0 8px 20px #0004 }
+  .btn.main { background:#fff; color:#17171a }
+  .btn.ghost { background:#0003; color:#fff }
+  .btn[disabled] { opacity:.4; pointer-events:none }
+  .cards { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; max-width:640px }
+  @media (max-width: 560px) { .cards { grid-template-columns:1fr } }
+  .card { text-align:left; background:#ffffff26; border:3px solid transparent; border-radius:20px; padding:16px 18px; color:#fff; cursor:pointer; font:inherit; transition:.2s; backdrop-filter:blur(6px) }
+  .card:hover { transform:translateY(-3px); background:#ffffff38 }
+  .card.on { background:#fff; color:#17171a; border-color:#fff; box-shadow:0 14px 34px #0005 }
+  .card .em { font-size:30px }
+  .card b { display:block; font-size:20px; margin:4px 0 2px }
+  .card small { display:block; font-size:14px; opacity:.85; line-height:1.35 }
+  .card q { display:block; margin-top:8px; font-style:normal; font-weight:700; font-size:14px; opacity:.95 }
+  .card .play { float:right; background:#0002; border-radius:99px; padding:3px 9px; font-size:13px }
+  .chips { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px }
+  .chip { border:0; border-radius:99px; padding:10px 16px; font:800 16px var(--font); background:#ffffff30; color:#fff; cursor:pointer; transition:.2s }
+  .chip.on { background:#fff; color:#17171a }
+  .field { margin-bottom:16px }
+  .field label { display:block; font-weight:700; font-size:14px; text-transform:uppercase; letter-spacing:.08em; opacity:.85; margin-bottom:8px }
+  .switch { display:flex; align-items:center; gap:12px; font-weight:700; font-size:18px; cursor:pointer; margin:0 0 14px; user-select:none }
+  .switch i { width:52px; height:30px; border-radius:15px; background:#fff4; position:relative; transition:.25s; flex:none }
+  .switch i::after { content:""; position:absolute; top:3px; left:3px; width:24px; height:24px; border-radius:50%; background:#fff; transition:.25s }
+  .switch.on i { background:#22c55e } .switch.on i::after { left:25px }
+  .summary { background:#0003; border-radius:16px; padding:12px 16px; font-size:16px; max-width:560px; margin-top:6px }
+  .cam { position:relative; width:100%; max-width:340px; border-radius:20px; overflow:hidden; box-shadow:0 18px 40px #0006; background:#000; aspect-ratio:4/3 }
+  .cam img { width:100%; height:100%; object-fit:cover; display:block }
+  .cam .off { position:absolute; inset:0; display:grid; place-items:center; text-align:center; padding:20px; font-weight:700; background:#000a }
+  .checks { display:grid; gap:10px; margin-top:16px; max-width:440px }
+  .check { display:flex; align-items:center; gap:12px; background:#0003; border-radius:14px; padding:12px 16px; font-weight:700; font-size:17px }
+  .check .tick { width:28px; height:28px; border-radius:50%; background:#fff3; display:grid; place-items:center; flex:none; transition:.3s }
+  .check.ok .tick { background:#22c55e }
+  .check small { display:block; font-weight:600; opacity:.8; font-size:13px }
+  .nav { display:flex; gap:12px; margin-top:28px; align-items:center }
+  .hintkey { opacity:.7; font-size:13px; margin-left:auto }
+  .prompt { background:#0004; border-radius:16px; padding:14px 16px; font:600 15px/1.45 ui-monospace,"SF Mono",monospace; max-width:560px; margin:12px 0; white-space:pre-wrap }
+  .live { background:#fff; color:#17171a; border-radius:20px; padding:14px 20px; font:800 24px/1.2 var(--font); max-width:560px; margin-top:16px; min-height:60px; box-shadow:0 12px 30px #0004 }
+  #fx { position:fixed; inset:0; pointer-events:none; z-index:20 }
+  .err { background:#7f1d1d; border-radius:12px; padding:10px 14px; margin:10px 0; font-weight:700; display:none }
+</style>
+</head>
+<body>
+<canvas id="fx"></canvas>
+<div id="app">
+  <div class="top"><img src="/logo.svg" alt=""><b>on-duty</b><div class="dots" id="dots"></div><button class="lang" id="langBtn"></button></div>
+  <div class="stage">
+    <svg class="mascot blink" id="mascot" viewBox="0 0 200 130" aria-hidden="true">
+      <ellipse cx="60" cy="62" rx="34" ry="30" fill="#fff"/><ellipse cx="140" cy="62" rx="34" ry="30" fill="#fff"/>
+      <g class="pupil" id="pupL"><circle cx="60" cy="62" r="14" fill="#18181b"/><circle cx="55" cy="56" r="4.5" fill="#fff"/></g>
+      <g class="pupil" id="pupR"><circle cx="140" cy="62" r="14" fill="#18181b"/><circle cx="135" cy="56" r="4.5" fill="#fff"/></g>
+      <defs><clipPath id="cl"><ellipse cx="60" cy="62" rx="34" ry="30"/></clipPath><clipPath id="cr"><ellipse cx="140" cy="62" rx="34" ry="30"/></clipPath></defs>
+      <g clip-path="url(#cl)"><rect class="lid" x="20" y="30" width="80" height="64" fill="#18181b"/></g>
+      <g clip-path="url(#cr)"><rect class="lid" x="100" y="30" width="80" height="64" fill="#18181b"/></g>
+      <rect class="brow" id="browL" x="28" y="18" width="58" height="9" rx="4.5" fill="#18181b"/>
+      <rect class="brow" id="browR" x="114" y="18" width="58" height="9" rx="4.5" fill="#18181b"/>
+      <path id="mouth" d="M75 110 Q100 126 125 110" fill="none" stroke="#18181b" stroke-width="7" stroke-linecap="round"/>
+    </svg>
+    <div class="panel" id="panel"></div>
+  </div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const S = {
+  en: {
+    start:'Let’s go', next:'Continue', back:'Back', skip:'Skip', finish:'Open my dashboard', saving:'Saving…',
+    h_welcome:["Hi, I’m on-duty.","Quick setup?"], p_welcome:'I watch your webcam and pull you back to work when you drop everything for your phone. Everything runs on this Mac — no image ever leaves it.',
+    pick_lang:'Language of the voice and the lines',
+    h_name:'What should I call you?', p_name:'A first name or a nickname. I’ll use it in the lines.', ph_name:'Your name', no_name:'I prefer no name',
+    h_tone:'How hard should I push?', p_tone:'You can change this any time. Tap a card to hear it.',
+    tone:{friendly:['😇','Friendly','Gentle nudges, never above “firm”.'],balanced:['😏','Balanced','Starts polite, escalates every few lines.'],ruthless:['😈','Ruthless','Skips the politeness. Escalates fast.'],chaos:['🤪','Pure chaos','Straight to drama. For the brave.']},
+    h_when:'When do you work?', p_when:'Outside these hours I sleep: no nagging, camera off.',
+    always:'Always on', hours:'Only during my work hours', brk:'Lunch / break', from:'from', to:'to',
+    days:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+    sum_always:'Always on. I never sleep (except when your screen does).', sum_hours:(d,a,b,br)=>`${d} · ${a}–${b}${br ? ' · break ' + br : ''}. Outside that I sleep and the camera light is off.`,
+    h_voice:'Pick my voice', p_voice:'Uses your Mac’s built-in voices.', voice_on:'Speak out loud', voice_off:'Silent: notifications and the dashboard only', default:'Default', listen:'▶ Listen',
+    h_cam:'Let’s check the camera', p_cam:'Sit like you normally work. Then pick up your phone so I can see it.',
+    c_cam:'Camera', c_cam_ok:'Working', c_cam_no:'Waiting for permission', c_face:'Your face', c_face_ok:'I can see you', c_face_no:'Look at the screen',
+    c_phone:'Phone', c_phone_ok:'Got it! 📱', c_phone_no:'Hold it up (optional)', c_phone_off:'Phone detection is off',
+    cam_perm:'Allow “OnDuty” in System Settings › Privacy & Security › Camera. I’ll keep trying.', phone_det:'Detect phones with the camera',
+    h_done:name=>name ? `All set, ${name}.` : 'All set.', p_done:'From here on I keep an eye on you during your work hours. Want to hear me?',
+    test:'Test a scolding', ai_h:'Want lines that sound like you?', ai_p:'Open Claude Code (or any AI assistant) in the on-duty folder and say:',
+    ai_prompt:'Personalize on-duty’s phrases for me.', copy:'Copy', copied:'Copied!', dash:'Open my dashboard',
+    err:'Could not save — is the service running?'},
+  pt: {
+    start:'Bora', next:'Continuar', back:'Voltar', skip:'Pular', finish:'Abrir meu painel', saving:'Salvando…',
+    h_welcome:["Oi, eu sou o on-duty.","Configuração rápida?"], p_welcome:'Eu olho a sua webcam e te puxo de volta pro trabalho quando você larga tudo pro celular. Tudo roda neste Mac — nenhuma imagem sai daqui.',
+    pick_lang:'Idioma da voz e das frases',
+    h_name:'Como eu te chamo?', p_name:'Nome ou apelido. Eu uso nas frases.', ph_name:'Seu nome', no_name:'Prefiro sem nome',
+    h_tone:'Quão pesado eu devo ser?', p_tone:'Dá pra mudar depois. Toque num cartão pra ouvir.',
+    tone:{friendly:['😇','Gentil','Cutucadas leves, nunca passa de “cobrança”.'],balanced:['😏','Equilibrado','Começa educado e sobe a cada poucas falas.'],ruthless:['😈','Implacável','Pula a educação. Escala rápido.'],chaos:['🤪','Caos total','Direto pro drama. Pros corajosos.']},
+    h_when:'Quando você trabalha?', p_when:'Fora desse horário eu durmo: sem bronca e com a câmera desligada.',
+    always:'Sempre ligado', hours:'Só no meu horário', brk:'Almoço / pausa', from:'das', to:'às',
+    days:['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'],
+    sum_always:'Sempre ligado. Só durmo quando a sua tela dorme.', sum_hours:(d,a,b,br)=>`${d} · ${a}–${b}${br ? ' · pausa ' + br : ''}. Fora disso eu durmo e a luz da câmera apaga.`,
+    h_voice:'Escolha a minha voz', p_voice:'Usa as vozes que já vêm no seu Mac.', voice_on:'Falar em voz alta', voice_off:'Mudo: só notificação e painel', default:'Padrão', listen:'▶ Ouvir',
+    h_cam:'Vamos testar a câmera', p_cam:'Sente como você trabalha normalmente. Depois pegue o celular pra eu ver.',
+    c_cam:'Câmera', c_cam_ok:'Funcionando', c_cam_no:'Esperando permissão', c_face:'Seu rosto', c_face_ok:'Tô te vendo', c_face_no:'Olhe pra tela',
+    c_phone:'Celular', c_phone_ok:'Peguei! 📱', c_phone_no:'Mostre ele (opcional)', c_phone_off:'Detecção de celular desligada',
+    cam_perm:'Libere o “OnDuty” em Ajustes do Sistema › Privacidade e Segurança › Câmera. Eu continuo tentando.', phone_det:'Detectar celular pela câmera',
+    h_done:name=>name ? `Tudo pronto, ${name}.` : 'Tudo pronto.', p_done:'A partir de agora eu fico de olho em você no seu horário de trabalho. Quer me ouvir?',
+    test:'Testar uma bronca', ai_h:'Quer frases com a sua cara?', ai_p:'Abra o Claude Code (ou qualquer assistente de IA) na pasta do on-duty e diga:',
+    ai_prompt:'Personalize as frases do on-duty pra mim.', copy:'Copiar', copied:'Copiado!', dash:'Abrir meu painel',
+    err:'Não consegui salvar — o serviço está rodando?'},
+};
+const PAL = [['#0f766e','#2563eb'],['#7c3aed','#db2777'],['#ea580c','#e11d48'],['#0369a1','#0f766e'],['#4338ca','#7c3aed'],['#0f766e','#22c55e'],['#be123c','#7e22ce']];
+let cfg = null, voices = [], step = 0, ui = (navigator.language || '').startsWith('pt') ? 'pt' : 'en', maxStep = 0, camTimer = null, lastSaid = 0;
+const t = k => S[ui][k];
+const STEPS = ['welcome', 'name', 'tone', 'when', 'voice', 'cam', 'done'];
+
+/* ---------- mascot ---------- */
+const FACE = { happy:[0,-2,0,0,'M75 108 Q100 128 125 108'], wow:[0,-4,-10,-5,'M82 112 Q100 134 118 112 Z'], think:[10,-6,10,-3,'M78 114 L122 114'], cool:[0,2,14,0,'M70 112 Q100 120 130 106'], party:[0,-2,-12,-6,'M68 106 Q100 140 132 106 Z'] };
+function face(k) { const [dx, dy, ang, bdy, m] = FACE[k] || FACE.happy; px = dx; py = dy; for (const id of ['pupL', 'pupR']) $(id).style.transform = `translate(${dx}px,${dy}px)`;
+  $('browL').style.transform = `translateY(${bdy}px) rotate(${ang}deg)`; $('browR').style.transform = `translateY(${bdy}px) rotate(${-ang}deg)`; $('mouth').setAttribute('d', m); }
+let px = 0, py = 0;
+addEventListener('pointermove', e => { const r = $('mascot').getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  const dx = Math.max(-1, Math.min(1, (e.clientX - cx) / 300)) * 8 + px, dy = Math.max(-1, Math.min(1, (e.clientY - cy) / 300)) * 6 + py;
+  for (const id of ['pupL', 'pupR']) $(id).style.transform = `translate(${dx}px,${dy}px)`; });
+function bounce() { const m = $('mascot'); m.classList.remove('bounce'); void m.getBoundingClientRect(); m.classList.add('bounce'); }
+
+/* ---------- confetti ---------- */
+const fxc = $('fx'), fg = fxc.getContext('2d'); let parts = [];
+function confetti() { fxc.width = innerWidth; fxc.height = innerHeight; const cols = ['#22c55e', '#f59e0b', '#3b82f6', '#ec4899', '#facc15', '#fff'];
+  for (let i = 0; i < 160; i++) parts.push({x:innerWidth / 2 + (Math.random() - .5) * 300, y:innerHeight * .5, vx:(Math.random() - .5) * 20, vy:-Math.random() * 18 - 4, r:Math.random() * 6 + 4, c:cols[i % 6], a:Math.random() * 6, life:1});
+  if (parts.length === 160) cl(); }
+function cl() { fg.clearRect(0, 0, fxc.width, fxc.height); parts = parts.filter(p => p.life > 0);
+  for (const p of parts) { p.x += p.vx; p.y += p.vy; p.vy += .5; p.vx *= .99; p.a += .2; p.life -= .009; fg.save(); fg.globalAlpha = Math.max(0, p.life); fg.translate(p.x, p.y); fg.rotate(p.a); fg.fillStyle = p.c; fg.fillRect(-p.r, -p.r / 2, p.r * 2, p.r); fg.restore(); }
+  if (parts.length) requestAnimationFrame(cl); else fg.clearRect(0, 0, fxc.width, fxc.height); }
+
+/* ---------- api ---------- */
+const api = (path, body) => fetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body || {})});
+async function save(part) { Object.assign(cfg, part); try { const r = await api('/api/config', part); if (!r.ok) throw 0; } catch { const e = $('err'); if (e) { e.style.display = 'block'; e.textContent = t('err'); } } }
+const say = (voice, text) => api('/api/say', {voice, text});
+const lang = () => cfg.lang === 'pt_BR' ? 'pt' : 'en';
+
+/* ---------- render ---------- */
+function dots() { $('dots').innerHTML = STEPS.map((_, i) => `<button class="${i === step ? 'on' : i <= maxStep ? 'done' : ''}" data-s="${i}" aria-label="${i + 1}"></button>`).join('');
+  $('dots').querySelectorAll('button').forEach(b => b.onclick = () => go(+b.dataset.s)); $('langBtn').textContent = ui === 'pt' ? '🇧🇷 PT' : '🇺🇸 EN'; }
+function nav(nextLabel, opts = {}) { return `<div class="err" id="err"></div><div class="nav">${step > 0 ? `<button class="btn ghost" id="bk">${t('back')}</button>` : ''}<button class="btn main" id="nx" ${opts.disabled ? 'disabled' : ''}>${nextLabel || t('next')}</button>${opts.skip ? `<button class="btn ghost" id="sk">${opts.skip}</button>` : ''}<span class="hintkey">↵ Enter</span></div>`; }
+function bindNav(onNext) { if ($('bk')) $('bk').onclick = () => go(step - 1); $('nx').onclick = async () => { await onNext?.(); go(step + 1); }; if ($('sk')) $('sk').onclick = () => go(step + 1); }
+function go(i) { clearInterval(camTimer); step = Math.max(0, Math.min(STEPS.length - 1, i)); maxStep = Math.max(maxStep, step); render(); }
+function render() {
+  const r = document.documentElement.style, pal = PAL[step]; r.setProperty('--c1', pal[0]); r.setProperty('--c2', pal[1]);
+  dots(); const p = $('panel'); p.style.animation = 'none'; void p.offsetWidth; p.style.animation = ''; bounce();
+  R[STEPS[step]](p);
+}
+const R = {
+  welcome(p) { face('wow');
+    p.innerHTML = `<h1>${t('h_welcome')[0]}<br>${t('h_welcome')[1]}</h1><p class="sub">${t('p_welcome')}</p>
+      <div class="field"><label>${t('pick_lang')}</label><div class="row">
+        <button class="card ${cfg.lang === 'pt_BR' ? 'on' : ''}" data-l="pt_BR" style="min-width:190px"><span class="em">🇧🇷</span><b>Português</b></button>
+        <button class="card ${cfg.lang === 'en_US' ? 'on' : ''}" data-l="en_US" style="min-width:190px"><span class="em">🇺🇸</span><b>English</b></button></div></div>
+      <div class="nav"><button class="btn main" id="nx">${t('start')}</button><span class="hintkey">↵ Enter</span></div>`;
+    p.querySelectorAll('[data-l]').forEach(b => b.onclick = async () => { ui = b.dataset.l === 'pt_BR' ? 'pt' : 'en'; await save({lang:b.dataset.l, voice:''}); render(); });
+    $('nx').onclick = () => go(1); },
+  name(p) { face('happy');
+    p.innerHTML = `<h1>${t('h_name')}</h1><p class="sub">${t('p_name')}</p><input type="text" id="nm" maxlength="40" placeholder="${t('ph_name')}" value="${cfg.name.replace(/"/g, '&quot;')}" autocomplete="off">${nav('', {skip:t('no_name')})}`;
+    const i = $('nm'); i.focus(); i.oninput = () => { face(i.value ? 'happy' : 'think'); }; bindNav(() => save({name:i.value.trim()}));
+    if ($('sk')) $('sk').onclick = async () => { await save({name:''}); go(2); }; },
+  tone(p) { face('cool');
+    const cards = Object.entries(t('tone')).map(([k, [em, tt, d]]) => `<button class="card ${cfg.tone === k ? 'on' : ''}" data-t="${k}"><span class="play">${t('listen')}</span><span class="em">${em}</span><b>${tt}</b><small>${d}</small><q data-q="${k}"></q></button>`).join('');
+    p.innerHTML = `<h1>${t('h_tone')}</h1><p class="sub">${t('p_tone')}</p><div class="cards">${cards}</div>${nav()}`; bindNav();
+    p.querySelectorAll('[data-t]').forEach(async b => { const k = b.dataset.t, q = b.querySelector('q');
+      const load = async () => { const j = await (await fetch(`/api/sample?lang=${cfg.lang}&tone=${k}&name=${encodeURIComponent(cfg.name)}`)).json(); q.textContent = j.text; return j.text; };
+      await load();
+      b.onclick = async () => { await save({tone:k}); p.querySelectorAll('[data-t]').forEach(x => x.classList.toggle('on', x === b)); const tx = await load(); say(cfg.voice, tx); face(k === 'chaos' ? 'party' : k === 'ruthless' ? 'cool' : 'happy'); bounce(); }; }); },
+  when(p) { face('think'); const sc = cfg.schedule, br = sc.breaks[0] || ['12:00', '13:30'];
+    p.innerHTML = `<h1>${t('h_when')}</h1><p class="sub">${t('p_when')}</p>
+      <div class="row" style="margin-bottom:16px"><button class="chip ${sc.enforce ? '' : 'on'}" id="alw">${t('always')}</button><button class="chip ${sc.enforce ? 'on' : ''}" id="hrs">${t('hours')}</button></div>
+      <div id="sched" style="${sc.enforce ? '' : 'display:none'}">
+        <div class="chips">${t('days').map((d, i) => `<button class="chip ${sc.days.includes(i + 1) ? 'on' : ''}" data-d="${i + 1}">${d}</button>`).join('')}</div>
+        <div class="row field"><span>${t('from')}</span><input type="time" id="st" value="${sc.start}"><span>${t('to')}</span><input type="time" id="en" value="${sc.end}"></div>
+        <div class="switch ${sc.breaks.length ? 'on' : ''}" id="brs"><i></i>${t('brk')}</div>
+        <div class="row field" id="brr" style="${sc.breaks.length ? '' : 'display:none'}"><span>${t('from')}</span><input type="time" id="b1" value="${br[0]}"><span>${t('to')}</span><input type="time" id="b2" value="${br[1]}"></div>
+      </div><div class="summary" id="sum"></div>${nav()}`; bindNav();
+    const upd = () => { const s = cfg.schedule; const days = [...p.querySelectorAll('[data-d].on')].map(b => +b.dataset.d);
+      s.enforce = $('hrs').classList.contains('on'); s.days = days; s.start = $('st').value || '09:00'; s.end = $('en').value || '18:00';
+      s.breaks = $('brs').classList.contains('on') ? [[$('b1').value || '12:00', $('b2').value || '13:30']] : [];
+      $('sched').style.display = s.enforce ? '' : 'none'; $('brr').style.display = s.breaks.length ? '' : 'none';
+      const lab = days.length === 5 && days.join('') === '12345' ? (ui === 'pt' ? 'Seg–Sex' : 'Mon–Fri') : days.map(d => t('days')[d - 1]).join(', ');
+      $('sum').textContent = s.enforce ? t('sum_hours')(lab || '—', s.start, s.end, s.breaks[0] ? s.breaks[0].join('–') : '') : t('sum_always');
+      save({schedule:s}); };
+    $('alw').onclick = () => { $('alw').classList.add('on'); $('hrs').classList.remove('on'); upd(); };
+    $('hrs').onclick = () => { $('hrs').classList.add('on'); $('alw').classList.remove('on'); upd(); };
+    p.querySelectorAll('[data-d]').forEach(b => b.onclick = () => { b.classList.toggle('on'); upd(); });
+    for (const id of ['st', 'en', 'b1', 'b2']) $(id).onchange = upd; $('brs').onclick = () => { $('brs').classList.toggle('on'); upd(); }; upd(); },
+  voice(p) { face('happy'); const loc = cfg.lang === 'pt_BR' ? 'pt' : 'en', list = voices.filter(v => v.locale.startsWith(loc));
+    const cur = cfg.voice || (cfg.lang === 'pt_BR' ? 'Luciana' : 'Samantha');
+    p.innerHTML = `<h1>${t('h_voice')}</h1><p class="sub">${t('p_voice')}</p>
+      <div class="switch ${cfg.voice_on ? 'on' : ''}" id="von"><i></i><span id="vlab">${cfg.voice_on ? t('voice_on') : t('voice_off')}</span></div>
+      <div class="row" id="vrow" style="${cfg.voice_on ? '' : 'display:none'}"><select id="vs">${list.map(v => `<option ${v.name === cur ? 'selected' : ''}>${v.name}</option>`).join('')}</select><button class="btn main" id="vp">${t('listen')}</button></div>${nav()}`;
+    bindNav(); const prev = async () => { const tx = (await (await fetch(`/api/sample?lang=${cfg.lang}&tone=${cfg.tone}&name=${encodeURIComponent(cfg.name)}`)).json()).text; say($('vs').value, tx); bounce(); };
+    $('vp').onclick = prev; $('vs').onchange = async () => { await save({voice:$('vs').value}); prev(); };
+    $('von').onclick = async () => { const on = !cfg.voice_on; $('von').classList.toggle('on', on); $('vlab').textContent = on ? t('voice_on') : t('voice_off'); $('vrow').style.display = on ? '' : 'none'; await save({voice_on:on}); }; },
+  cam(p) { face('wow');
+    p.innerHTML = `<h1>${t('h_cam')}</h1><p class="sub">${t('p_cam')}</p>
+      <div class="cam"><img id="cimg" alt=""><div class="off" id="coff" style="display:none">${t('cam_perm')}</div></div>
+      <div class="checks"><div class="check" id="k1"><span class="tick">✓</span><div>${t('c_cam')}<small id="k1s"></small></div></div>
+      <div class="check" id="k2"><span class="tick">✓</span><div>${t('c_face')}<small id="k2s"></small></div></div>
+      <div class="check" id="k3"><span class="tick">✓</span><div>${t('c_phone')}<small id="k3s"></small></div></div></div>
+      <div class="switch ${cfg.phone_detection ? 'on' : ''}" id="pd" style="margin-top:16px"><i></i>${t('phone_det')}</div>${nav()}`; bindNav();
+    $('pd').onclick = async () => { const on = !cfg.phone_detection; $('pd').classList.toggle('on', on); await save({phone_detection:on}); };
+    let phoneSeen = false;
+    const poll = async () => { try { const s = await (await fetch('/status')).json(); $('cimg').src = '/frame.jpg?' + Date.now();
+      const cam = s.camera_ok !== false && s.mode === 'active' && s.face !== undefined; $('coff').style.display = s.camera_ok === false ? 'grid' : 'none';
+      const set = (id, ok, txt) => { $(id).classList.toggle('ok', ok); $(id + 's').textContent = txt; };
+      set('k1', cam, cam ? t('c_cam_ok') : t('c_cam_no')); set('k2', !!s.face, s.face ? t('c_face_ok') : t('c_face_no'));
+      if (s.phone) phoneSeen = true; set('k3', phoneSeen, !cfg.phone_detection || !s.phone_on && !phoneSeen ? t('c_phone_off') : phoneSeen ? t('c_phone_ok') : t('c_phone_no'));
+      if (phoneSeen && !$('k3').dataset.p) { $('k3').dataset.p = 1; face('party'); bounce(); confetti(); } else if (s.face && !$('k3').dataset.p) face('happy'); } catch {} };
+    poll(); camTimer = setInterval(poll, 700); },
+  async done(p) { face('party'); confetti(); await save({onboarded:true});
+    p.innerHTML = `<h1>${t('h_done')(cfg.name)}</h1><p class="sub">${t('p_done')}</p>
+      <div class="row"><button class="btn main" id="tst">${t('test')}</button><button class="btn ghost" id="dsh">${t('dash')}</button></div>
+      <div class="live" id="live" style="display:none"></div>
+      <div style="margin-top:34px"><b style="font-size:20px">${t('ai_h')}</b><p class="sub" style="margin:6px 0 0;font-size:16px">${t('ai_p')}</p>
+        <div class="prompt" id="aip">${t('ai_prompt')}</div><button class="btn ghost" id="cpy" style="padding:10px 20px;font-size:15px">${t('copy')}</button></div>`;
+    $('dsh').onclick = () => { location.href = '/'; };
+    $('cpy').onclick = () => { navigator.clipboard?.writeText($('aip').textContent); $('cpy').textContent = t('copied'); setTimeout(() => $('cpy').textContent = t('copy'), 1500); };
+    $('tst').onclick = async () => { await api('/test'); face('cool'); bounce(); const live = $('live'); live.style.display = 'block'; live.textContent = '…';
+      for (let i = 0; i < 12; i++) { await new Promise(r => setTimeout(r, 400)); const s = await (await fetch('/status')).json(); if (s.said && s.said.id !== lastSaid && s.said.kind === 'test') { lastSaid = s.said.id; live.textContent = s.said.text; face('wow'); break; } } };
+    fetch('/status').then(r => r.json()).then(s => { lastSaid = s.said ? s.said.id : 0; }); },
+};
+addEventListener('keydown', e => { if (e.key === 'Enter' && !e.target.matches('button') && $('nx') && !$('nx').disabled) $('nx').click(); });
+$('langBtn').onclick = async () => { ui = ui === 'pt' ? 'en' : 'pt'; await save({lang:ui === 'pt' ? 'pt_BR' : 'en_US', voice:''}); render(); };
+
+(async () => {
+  const j = await (await fetch('/api/config')).json(); cfg = j.config; voices = j.voices;
+  if (!cfg.onboarded) ui = (navigator.language || '').startsWith('pt') ? 'pt' : 'en'; else ui = lang();
+  if (!cfg.onboarded && cfg.lang !== (ui === 'pt' ? 'pt_BR' : 'en_US')) await save({lang:ui === 'pt' ? 'pt_BR' : 'en_US'});
+  const q = new URLSearchParams(location.search);
+  step = q.has('step') ? +q.get('step') : cfg.onboarded && q.has('edit') ? 1 : 0; maxStep = cfg.onboarded ? STEPS.length - 1 : 0; render();
+})();
+</script>
+</body>
+</html>

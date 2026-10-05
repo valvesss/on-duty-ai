@@ -1,92 +1,174 @@
+<div align="center">
+
+<img src="assets/logo.svg" width="112" alt="on-duty logo">
+
 # on-duty
 
-<img src="assets/logo.svg" width="96" align="right" alt="">
+**Your webcam notices when you stop working and start doomscrolling — and talks you back to your desk.**
 
-Your webcam notices when you stop working and start doomscrolling on your phone — and talks you back
-to your desk. Everything runs locally on your Mac: no cloud, no LLM at runtime, no frames leave the machine.
+Local. Private. Slightly judgmental.
 
-*[Português abaixo](#português)*
+![macOS](https://img.shields.io/badge/macOS-Apple%20Silicon%20%26%20Intel-black?logo=apple)
+![Python](https://img.shields.io/badge/python-3.12-3776ab?logo=python&logoColor=white)
+![License](https://img.shields.io/badge/license-MIT-green)
+![No cloud](https://img.shields.io/badge/cloud-none-success)
 
-<p align="center"><img src="assets/dashboard.png" width="720" alt="Dashboard (camera blurred)"></p>
+<img src="assets/dashboard.png" width="820" alt="The on-duty live dashboard at nag level 5, camera blurred">
 
-## How it works
-
-| Signal | How |
-|---|---|
-| Head pitch / eyes looking down | MediaPipe Face Landmarker, relative to **your** working posture (learned while you type, so camera angle doesn't matter) |
-| Phone in frame | YOLO11n (COCO "cell phone") |
-| You stopped typing | macOS `HIDIdleTime` |
-
-**Trigger:** phone seen (~1 s) + 2 s without keyboard/mouse, **or** looking down for ≥60% of the last 8 s + 6 s without input.
-Then it speaks, escalating every 3 lines through 5 levels (gentle → sarcastic → firm → drama → chaos),
-until you touch the keyboard again.
-
-Dashboard at <http://localhost:7878> — keep it open and it becomes a show:
-
-- **Live stage:** a mascot whose face (and the whole page's mood) escalates with the nag level, and the
-  line being spoken **types out live** in a speech bubble.
-- **"Caught red-handed" polaroid** with your camera frame, a stamp and a running clock.
-- **📸 Snap:** turns any moment (or any line from the *Hall of shame*) into a 4:5 card for stories/chats —
-  download, copy or share. Level 4–5 lines pulse the button: those are the ones worth posting.
-- Blur button for the camera preview, history charts, and a collapsible panel with the raw signals.
-
-Your data (events + calibration) lives in `~/.on-duty/on-duty.db`.
-
-## Install
-
-Needs macOS, [uv](https://docs.astral.sh/uv/), and Apple Silicon for phone detection (Intel works with the face signal only).
-
-```bash
-git clone https://github.com/valvesss/on-duty-ai && cd on-duty-ai
-./onduty install     # deps, models, LaunchAgent (starts at login)
-./onduty setup       # your name + language (pt_BR | en_US)
-./onduty doctor      # check everything
-```
-
-Allow **Camera** for OnDuty when macOS asks.
-
-## Commands
-
-```
-./onduty install | uninstall | start | stop | restart | status | logs | stats | db | doctor
-./onduty setup [--name N] [--lang en_US] [--voice Samantha]
-./onduty phrases template | validate | sources
-```
-
-Settings live in `~/.on-duty/config.json` (name, language, voice, port, camera, thresholds).
-
-### Personalized phrases (optional)
-
-Ask your AI assistant to personalize the lines — in Claude Code, open this repo and say
-"personalize on-duty's phrases". The `on-duty-phrases` skill (`.claude/skills/`) lists the memory/rules
-files other assistants left on your Mac (Claude Code, Cursor, Codex, Gemini, Windsurf, Copilot…) with
-`./onduty phrases sources`, **asks before reading any of them**, mines them for things to joke about
-(your stack, projects, running gags — never secrets or anything private), and writes
-`~/.on-duty/phrases.json`. Any assistant works: `./onduty phrases template` prints the schema and
-`./onduty phrases validate` checks the result. Built-in lines are mixed in
-(`"custom_phrases_only": true` to use only yours). No API key, no network.
+</div>
 
 ---
 
-## Português
-
-A webcam percebe quando você larga o trabalho pra rolar o celular e te chama de volta. Tudo roda local
-no seu Mac: sem nuvem, sem LLM em execução, nenhuma imagem sai da máquina.
-
-**Gatilho:** celular visto (~1 s) + 2 s sem teclado/mouse, **ou** cabeça/olhar pra baixo em ≥60% dos
-últimos 8 s + 6 s sem teclado. Aí ela fala sem parar, subindo de nível a cada 3 falas (gentil →
-sarcástico → cobrança → drama → caos) até você voltar a digitar.
+## Install
 
 ```bash
-git clone https://github.com/valvesss/on-duty-ai && cd on-duty-ai
-./onduty install
-./onduty setup --lang pt_BR --name "Seu nome"
-./onduty doctor
+curl -fsSL https://raw.githubusercontent.com/valvesss/on-duty-ai/main/install.sh | bash
 ```
 
-Painel em <http://localhost:7878> (idioma segue a configuração; botão para borrar a câmera).
-Frases personalizadas: peça ao seu assistente de IA (no Claude Code, a skill `on-duty-phrases`) e valide com `./onduty phrases validate`.
+That's it. A setup page opens in your browser and walks you through the rest in about a minute.
+Prefer to read the script first? [`install.sh`](install.sh) is short and readable. Or do it by hand:
+
+```bash
+git clone https://github.com/valvesss/on-duty-ai && cd on-duty-ai && ./onduty install
+```
+
+> Needs macOS and [uv](https://docs.astral.sh/uv/) (the installer gets it for you). When macOS asks, allow **Camera** for *OnDuty*.
+
+## What you get
+
+| | |
+|---|---|
+| 🧭 **First-run wizard** | Name, language, how hard it should push, your work hours and breaks, voice, and a live camera check. Opens by itself after install. |
+| 🎭 **A live stage** | A mascot whose face — and the whole page's mood — escalates with every nag. The line being spoken **types out live** in a speech bubble. |
+| 📸 **Shareable moments** | One click turns a moment (or any line from the *Hall of shame*) into a 4:5 "caught red-handed" card for stories and group chats. |
+| 😴 **Not always on** | Sleeps — camera light off — when your screen sleeps or locks, outside your work hours, on breaks, or when you've walked away. |
+| 🧠 **Lines that sound like you** | Your AI assistant can write the phrases from what it already knows about you. |
+| 🔒 **Private by design** | No cloud, no account, no LLM at runtime. Frames never leave your Mac and are never saved. |
+
+<table>
+<tr>
+<td width="58%"><img src="assets/setup.png" alt="The setup wizard, tone step"></td>
+<td width="42%"><img src="assets/card.png" alt="A shareable caught-red-handed card"></td>
+</tr>
+<tr>
+<td align="center"><sub>The setup wizard — one question at a time, the mascot follows your cursor</sub></td>
+<td align="center"><sub>The shareable card</sub></td>
+</tr>
+</table>
+
+## How it works
+
+```mermaid
+flowchart LR
+    cam[Webcam] --> face[MediaPipe<br/>head pitch + gaze]
+    cam --> yolo[YOLO11n<br/>phone in frame]
+    hid[macOS idle time<br/>keyboard / mouse] --> trig{Trigger}
+    face --> trig
+    yolo --> trig
+    trig -- phone seen + 2 s idle<br/>or looking down + 6 s idle --> nag[Speaks + notifies<br/>escalating levels]
+    nag -- you type again --> done[Welcome back 🎉]
+```
+
+- **Your posture is the baseline.** Head pitch and eye gaze are measured *relative to how you sit while typing*, so camera angle doesn't matter.
+- **Phone in frame** (YOLO11n, COCO "cell phone") is an instant signal. It needs Apple Silicon; on Intel the face signal still works.
+- **Only typing ends it.** Once it starts, it keeps talking — five levels, gentle → sarcastic → firm → drama → chaos — until you touch the keyboard or mouse again.
+
+### When it sleeps
+
+on-duty isn't a background hog. It drops the camera and goes quiet when:
+
+| Situation | Behavior |
+|---|---|
+| Screen asleep, locked, or another user's session in front | Camera released, polls every few seconds |
+| Outside your work days/hours, or during a break | Camera released, wakes by itself at the next window |
+| You paused it (⏸ in the dashboard, or `./onduty pause 60`) | Camera released until it expires |
+| No face for 2 min *and* no input for 3 min | Camera released until you touch the Mac |
+
+The dashboard shows each state (and when it's back) instead of going blank.
+
+## The dashboard
+
+Open <http://localhost:7878> and keep it on a second monitor.
+
+- **Live speech bubble** — each line appears as it's spoken.
+- **Polaroid** with your camera frame (there's a blur button), a stamp and a running clock.
+- **📸 Snap** — builds the shareable card; download, copy, or share. Level 4–5 lines make the button pulse: those are the ones worth posting.
+- **Hall of shame** — today's heaviest lines, one tap each from becoming a card.
+- History charts, focus streak, and a collapsible panel with the raw signals.
+- **⚙** reopens the wizard any time; **⏸** pauses for an hour or until tomorrow.
+
+## Personalize the lines
+
+Out of the box on-duty speaks built-in lines in English or Brazilian Portuguese. To make them about *you*:
+
+1. Open Claude Code (or any AI assistant) in this folder.
+2. Say: **"Personalize on-duty's phrases for me."**
+
+The bundled [`on-duty-phrases`](.claude/skills/on-duty-phrases/SKILL.md) skill lists the memory and rules files your other assistants left on your Mac (Claude Code, Cursor, Codex, Gemini, Windsurf, Copilot…), **asks before reading any of them**, mines them for things to joke about — your stack, your projects, your running gags; never secrets or anything private — and writes `~/.on-duty/phrases.json`.
+
+Using another assistant? `./onduty phrases template` prints the schema, `./onduty phrases validate` checks the result.
+
+## Commands
+
+```text
+./onduty install | uninstall      install / remove the background service (starts at login)
+./onduty start | stop | restart   control it
+./onduty open                     open the dashboard
+./onduty setup                    reopen the setup wizard
+./onduty pause 60 | tomorrow | 0  pause for N minutes, until tomorrow, or resume
+./onduty status | logs | stats    what's it doing, tail the log, summary from the local database
+./onduty doctor                   check your setup
+./onduty phrases template | validate | sources
+```
+
+## Configuration
+
+Everything lives in `~/.on-duty/config.json` and is editable from the wizard.
+
+| Key | Default | |
+|---|---|---|
+| `name` | `""` | Used in lines (`{name}`); lines that need it are skipped when empty |
+| `lang` | `pt_BR` | `pt_BR` or `en_US` — voice and lines |
+| `tone` | `balanced` | `friendly` · `balanced` · `ruthless` · `chaos` |
+| `voice` / `voice_on` | default / `true` | Any macOS voice; off = notifications and dashboard only |
+| `schedule` | Mon–Fri 09:00–18:00, break 12:00–13:30 | `"enforce": false` = always on |
+| `phone_detection` | `true` | The YOLO phone detector |
+| `custom_phrases_only` | `false` | Use only your `phrases.json` instead of mixing with the built-ins |
+| `thresholds` | see [`config.py`](config.py) | Head/gaze sensitivity, idle seconds, YOLO confidence |
+
+Your data (events and posture calibration) stays in `~/.on-duty/on-duty.db`, a plain SQLite file.
+
+## Troubleshooting
+
+<details><summary><b>The camera check says "waiting for permission"</b></summary>
+
+Allow **OnDuty** in *System Settings › Privacy & Security › Camera*. The wizard keeps retrying. If it's not listed, run `./onduty restart`.
+</details>
+
+<details><summary><b>It nags while I'm clearly working</b></summary>
+
+It needs a few seconds of typing to learn your posture after install. If it still misfires, raise `pitch_delta` or `down_ratio` in `config.json` (thresholds), or restart after changing your camera position drastically.
+</details>
+
+<details><summary><b>It doesn't see my phone</b></summary>
+
+Phone detection needs Apple Silicon and decent light. Check `./onduty doctor`, and make sure the phone is visible in the wizard's camera step.
+</details>
+
+<details><summary><b>Does anything leave my Mac?</b></summary>
+
+No. Frames are processed in memory, the dashboard only listens on `127.0.0.1`, and there is no telemetry. The only downloads happen at install: Python packages and the two model files.
+</details>
+
+<details><summary><b>Uninstall</b></summary>
+
+`./onduty uninstall`, then delete the folder and `~/.on-duty`.
+</details>
+
+## Under the hood
+
+Python 3.12 · [MediaPipe](https://ai.google.dev/edge/mediapipe) Face Landmarker · [Ultralytics](https://github.com/ultralytics/ultralytics) YOLO11n · macOS `say`, `ioreg` and CoreGraphics · a single-file dashboard and wizard in plain HTML/JS (no build step) · a LaunchAgent that starts it at login.
 
 ## License
 
-MIT
+[MIT](LICENSE) © Vitor Alves

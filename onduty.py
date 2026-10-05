@@ -8,6 +8,7 @@ import shutil
 import sqlite3
 import subprocess
 import sys
+import time
 import urllib.request
 from pathlib import Path
 
@@ -80,7 +81,7 @@ def cmd_install(_a) -> None:
   <key>ProgramArguments</key><array><string>/usr/bin/open</string><string>-W</string><string>{APP}</string></array>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
-  <key>ThrottleInterval</key><integer>30</integer>
+  <key>ThrottleInterval</key><integer>5</integer>
 </dict></plist>
 """)
     legacy = PLIST.with_name("com.valvesss.onduty.plist")  # pre-0.3 label of the author's install
@@ -91,9 +92,18 @@ def cmd_install(_a) -> None:
     sh("pkill", "-f", f"{DIR}/on_duty.py")  # bootout doesn't always take down the app `open` launched
     sh("launchctl", "bootstrap", f"gui/{UID}", str(PLIST), check=True)
     cfg = config.load()
-    print(f"installed. Allow Camera for OnDuty if macOS asks.\nDashboard: http://localhost:{cfg['port']} · log: {LOG}")
-    if not cfg["name"]:
-        print("tip: ./onduty setup   (set your name and language)")
+    url = f"http://localhost:{cfg['port']}"
+    print(f"installed. Allow Camera for OnDuty if macOS asks. Log: {LOG}")
+    for _ in range(40):  # the engine needs a few seconds to load its models
+        try:
+            urllib.request.urlopen(url + "/status", timeout=1)
+            break
+        except OSError:
+            time.sleep(1)
+    else:
+        sys.exit(f"the service didn't come up; see {LOG}")
+    sh("open", url + ("" if cfg["onboarded"] else "/setup"))
+    print(f"opened {url}{'' if cfg['onboarded'] else '/setup — finish the setup there'}")
 
 
 def cmd_uninstall(_a) -> None:
@@ -115,7 +125,19 @@ def cmd_stop(_a) -> None:
 
 def cmd_restart(a) -> None:
     cmd_stop(a)
+    time.sleep(1)
     cmd_start(a)
+
+
+def cmd_open(_a) -> None:
+    sh("open", f"http://localhost:{config.load()['port']}")
+
+
+def cmd_pause(a) -> None:
+    body = json.dumps({"minutes": "tomorrow" if a.minutes == "tomorrow" else float(a.minutes)}).encode()
+    req = urllib.request.Request(f"http://localhost:{config.load()['port']}/api/pause", body, {"Content-Type": "application/json"})
+    urllib.request.urlopen(req, timeout=3)
+    print("resumed" if a.minutes == "0" else f"paused ({a.minutes})")
 
 
 def cmd_status(_a) -> None:
@@ -148,14 +170,12 @@ def cmd_stats(_a) -> None:
 
 def cmd_setup(a) -> None:
     cfg = config.load()
-    if a.name is None and a.lang is None and a.voice is None:
-        cfg["name"] = input(f"Your name (blank = none) [{cfg['name']}]: ").strip() or cfg["name"]
-        lang = input(f"Language pt_BR/en_US [{cfg['lang']}]: ").strip()
-        cfg["lang"] = lang if lang in config.VOICES else cfg["lang"]
-    else:
-        cfg["name"] = cfg["name"] if a.name is None else a.name
-        cfg["lang"] = a.lang or cfg["lang"]
-        cfg["voice"] = cfg["voice"] if a.voice is None else a.voice
+    if a.name is None and a.lang is None and a.voice is None:  # no flags: the wizard is the setup
+        sh("open", f"http://localhost:{cfg['port']}/setup?edit")
+        return
+    cfg["name"] = cfg["name"] if a.name is None else a.name
+    cfg["lang"] = a.lang or cfg["lang"]
+    cfg["voice"] = cfg["voice"] if a.voice is None else a.voice
     config.save(cfg)
     print(f"saved {config.CONFIG_PATH}")
     if PLIST.exists():
@@ -230,7 +250,10 @@ def main() -> None:
                         ("stats", cmd_stats, "summary from the local database"), ("db", cmd_db, "SQL shell"),
                         ("doctor", cmd_doctor, "check the setup")]:
         sub.add_parser(name, help=h).set_defaults(fn=fn)
-    s = sub.add_parser("setup", help="set name / language / voice (interactive without flags)")
+    sub.add_parser("open", help="open the dashboard").set_defaults(fn=cmd_open)
+    pz = sub.add_parser("pause", help="pause: <minutes> | tomorrow | 0 (resume)")
+    pz.add_argument("minutes"), pz.set_defaults(fn=cmd_pause)
+    s = sub.add_parser("setup", help="open the setup wizard (or set --name/--lang/--voice directly)")
     s.add_argument("--name"), s.add_argument("--lang", choices=list(config.VOICES)), s.add_argument("--voice")
     s.set_defaults(fn=cmd_setup)
     ph = sub.add_parser("phrases", help="phrases template | validate | sources  (custom pack: ~/.on-duty/phrases.json)")

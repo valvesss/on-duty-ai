@@ -13,9 +13,12 @@ touch the keyboard again.
 
 import argparse
 import collections
+import ctypes
+import ctypes.util
 import datetime as dt
 import importlib
 import json
+import os
 import platform
 import random
 import statistics
@@ -39,7 +42,8 @@ FACE_MODEL = HERE / "models" / "face_landmarker.task"
 YOLO_MODEL = HERE / "models" / "yolo11n.pt"
 
 STATE: dict = {"status": {}, "jpeg": b"", "events": collections.deque(maxlen=30),
-               "series": collections.deque(maxlen=240), "test": False, "blur": False, "said": None, "said_id": 0}
+               "series": collections.deque(maxlen=240), "test": False, "blur": False, "said": None, "said_id": 0,
+               "reload": False, "pause_until": 0.0, "preview": None}
 
 T = {  # the few strings the engine says outside the phrase packs
     "pt_BR": {"level": "Nível {lv} de 5", "sec": "{n} segundos", "min1": "1 minuto", "min": "{n} minutos"},
@@ -53,36 +57,148 @@ def log(msg: str) -> None:
         STATE["events"].appendleft(f"{dt.datetime.now():%H:%M:%S} {msg}")
 
 
+CFG: dict = {}  # live config; mutated in place by POST /api/config, picked up by the main loop
+HHMM = __import__("re").compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+
+
+def voices() -> list[dict]:
+    out = subprocess.run(["say", "-v", "?"], capture_output=True, text=True).stdout
+    res = []
+    for line in out.splitlines():
+        head = line.split("#")[0].split()
+        if len(head) >= 2 and head[-1][:2] in ("pt", "en"):
+            res.append({"name": " ".join(head[:-1]), "locale": head[-1]})
+    return res
+
+
+def sample_line(lang: str, tone: str, name: str) -> str:
+    pack = importlib.import_module(f"phrases.{lang if lang in config.VOICES else 'en_US'}")
+    t = config.TONES.get(tone, config.TONES["balanced"])
+    pool = [x for x in pack.LEVELS[t["start"] + (0 if t["cap"] < 3 else 1)] if isinstance(x, str) and ("{name}" in x) == bool(name)]
+    pool = pool or [x for x in pack.LEVELS[t["start"]] if isinstance(x, str)]
+    return random.choice(pool).format(name=name, time="3", n=3)
+
+
+def validate_config(new: dict) -> dict:
+    """Merge a partial config from the setup page over the current one; raises ValueError on junk."""
+    cfg = config.merge({**CFG, **{k: v for k, v in new.items() if k in config.DEFAULTS}})
+    cfg["name"] = str(cfg["name"]).strip()[:40]
+    sch = cfg["schedule"]
+    times = [sch["start"], sch["end"], *[t for b in sch["breaks"] for t in b]]
+    if not all(isinstance(t, str) and HHMM.match(t) for t in times):
+        raise ValueError("times must be HH:MM")
+    sch["days"] = sorted({int(d) for d in sch["days"] if 1 <= int(d) <= 7})
+    cfg["port"], cfg["camera"] = CFG["port"], CFG["camera"]  # needs a restart; not editable from the page
+    return cfg
+
+
+def work_window(now: dt.datetime) -> tuple[bool, str]:
+    """(inside working hours?, why not: day | hours | break)"""
+    sch = CFG["schedule"]
+    if not sch["enforce"]:
+        return True, ""
+    if now.isoweekday() not in sch["days"]:
+        return False, "day"
+    hm = now.strftime("%H:%M")
+    if any(a <= hm < b for a, b in sch["breaks"]):
+        return False, "break"
+    return (sch["start"] <= hm < sch["end"]), "hours"
+
+
+def next_on(now: dt.datetime) -> int:
+    """Epoch of the next minute that is inside working hours (for 'back at 09:00')."""
+    t = now.replace(second=0, microsecond=0)
+    for _ in range(8 * 24 * 60):
+        t += dt.timedelta(minutes=1)
+        if work_window(t)[0]:
+            return int(t.timestamp())
+    return 0
+
+
+_cg = ctypes.CDLL(ctypes.util.find_library("CoreGraphics"))
+_cg.CGMainDisplayID.restype = ctypes.c_uint32
+_cg.CGDisplayIsAsleep.argtypes = [ctypes.c_uint32]
+
+
+def system_asleep() -> bool:
+    """Display asleep, screen locked, or another user's session is in front."""
+    if _cg.CGDisplayIsAsleep(_cg.CGMainDisplayID()):
+        return True
+    root = subprocess.run(["ioreg", "-n", "Root", "-d1"], capture_output=True, text=True).stdout
+    return '"IOConsoleLocked" = Yes' in root or '"kCGSSessionOnConsoleKey"=No' in root
+
+
 class Dashboard(BaseHTTPRequestHandler):
     def log_message(self, *_):
         pass
 
-    def _send(self, body: bytes, ctype: str) -> None:
-        self.send_response(200)
+    def _send(self, body: bytes, ctype: str, code: int = 200, headers: dict | None = None) -> None:
+        self.send_response(code)
         self.send_header("Content-Type", ctype)
         self.send_header("Cache-Control", "no-store")
+        for k, v in (headers or {}).items():
+            self.send_header(k, v)
         self.end_headers()
         self.wfile.write(body)
 
+    def _json(self, obj, code: int = 200) -> None:
+        self._send(json.dumps(obj).encode(), "application/json", code)
+
     def do_GET(self):
-        path = self.path.split("?")[0]
+        path, _, query = self.path.partition("?")
+        args = dict(p.split("=", 1) for p in query.split("&") if "=" in p)
         if path == "/status":
-            self._send(json.dumps({**STATE["status"], "events": list(STATE["events"]),
-                                   "series": list(STATE["series"])}).encode(), "application/json")
+            self._json({**STATE["status"], "events": list(STATE["events"]), "series": list(STATE["series"])})
         elif path == "/history":
             self._send(db.history_ndjson(), "application/x-ndjson")
         elif path == "/frame.jpg":
             self._send(STATE["jpeg"], "image/jpeg")
         elif path == "/logo.svg":
             self._send((HERE / "assets" / "logo.svg").read_bytes(), "image/svg+xml")
+        elif path == "/api/config":
+            self._json({"config": CFG, "voices": voices(), "tones": config.TONES})
+        elif path == "/api/sample":
+            self._json({"text": sample_line(args.get("lang", "en_US"), args.get("tone", "balanced"), args.get("name", ""))})
+        elif path == "/setup":
+            self._send((HERE / "setup.html").read_bytes(), "text/html; charset=utf-8")
+        elif not CFG["onboarded"]:
+            self._send(b"", "text/plain", 302, {"Location": "/setup"})
         else:
             self._send((HERE / "dashboard.html").read_bytes(), "text/html; charset=utf-8")
 
     def do_POST(self):
+        n = int(self.headers.get("Content-Length") or 0)
+        try:
+            body = json.loads(self.rfile.read(n) or b"{}")
+        except json.JSONDecodeError:
+            return self._json({"error": "bad json"}, 400)
         if self.path == "/blur":
             STATE["blur"] = not STATE["blur"]
-        else:
-            STATE["test"] = self.path == "/test"
+        elif self.path == "/test":
+            STATE["test"] = True
+        elif self.path == "/api/config":
+            try:
+                new = validate_config(body)
+            except (ValueError, TypeError, KeyError) as e:
+                return self._json({"error": str(e)}, 400)
+            CFG.clear()
+            CFG.update(new)
+            config.save(CFG)
+            STATE["reload"] = True
+            return self._json({"config": CFG})
+        elif self.path == "/api/pause":  # minutes: 0 resumes, "tomorrow" = until 06:00 tomorrow
+            m = body.get("minutes", 0)
+            if m == "tomorrow":
+                tm = dt.datetime.now().replace(hour=6, minute=0, second=0, microsecond=0) + dt.timedelta(days=1)
+                STATE["pause_until"] = tm.timestamp()
+            else:
+                STATE["pause_until"] = time.time() + float(m) * 60 if float(m) > 0 else 0
+        elif self.path == "/api/say":  # voice preview in the setup wizard
+            if STATE["preview"] and STATE["preview"].poll() is None:
+                STATE["preview"].kill()
+            voice = body.get("voice") or config.voice(CFG)
+            if voice in {v["name"] for v in voices()}:
+                STATE["preview"] = subprocess.Popen(["say", "-v", voice, "-r", "190", str(body.get("text", ""))[:300]])
         self._send(b"ok", "text/plain")
 
 
@@ -114,14 +230,14 @@ def load_phrases(cfg: dict) -> tuple[list, dict]:
 
 
 class Nagger:
-    """Talks without overlapping itself; escalates one level every NAGS_PER_LEVEL lines."""
+    """Talks without overlapping itself; escalates by tone."""
 
-    NAGS_PER_LEVEL = 3
-    GAP = [10, 8, 6, 5, 4]  # seconds of silence between lines, per level
+    GAP = [10, 8, 6, 5, 4]  # seconds of silence between lines, per level (scaled by the tone)
     RATE = [185, 190, 200, 210, 225]  # `say` words per minute, per level
 
     def __init__(self, cfg: dict, voice_on: bool):
-        self.cfg, self.voice_on, self.voice = cfg, voice_on, config.voice(cfg)
+        self.cfg, self.voice_on, self.voice = cfg, voice_on and cfg["voice_on"], config.voice(cfg)
+        self.tone = config.TONES[cfg["tone"]]
         self.t = T.get(cfg["lang"], T["en_US"])
         self.levels, self.back = load_phrases(cfg)
         self.proc, self.ended, self.bags = None, 0.0, {}
@@ -160,10 +276,14 @@ class Nagger:
         return text
 
     def level(self, n: int) -> int:
-        return min(4, max(0, n - 1) // self.NAGS_PER_LEVEL)
+        return min(self.tone["cap"], self.tone["start"] + max(0, n - 1) // self.tone["per"])
+
+    def shut_up(self) -> None:
+        if self.proc and self.proc.poll() is None:
+            self.proc.kill()
 
     def ready(self, n: int) -> bool:
-        return not self.speaking() and time.time() - self.ended >= self.GAP[self.level(n)]
+        return not self.speaking() and time.time() - self.ended >= self.GAP[self.level(n)] * self.tone["gap"]
 
     def nag(self, n: int, minutes: float) -> str:
         lv = self.level(n)
@@ -205,22 +325,26 @@ def load_yolo(cfg: dict):
     return YOLO(str(YOLO_MODEL))  # ~5 MB, downloaded on first run
 
 
+AWAY_IDLE = 180    # s without input AND ...
+AWAY_NOFACE = 120  # ... s without seeing a face → release the camera and sleep until you touch the machine
+SLEEP_POLL = {"asleep": 3, "paused": 5, "offduty": 15, "away": 1}
+BLANK = cv2.imencode(".jpg", np.zeros((360, 480, 3), np.uint8))[1].tobytes()
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description="on-duty engine (normally started by the OnDuty.app service)")
     p.add_argument("--no-voice", action="store_true")
     p.add_argument("--fps", type=float, default=2.0)
     p.add_argument("--debug", action="store_true", help="log signals every 5 s")
     a = p.parse_args()
-    cfg = config.load()
-    th = cfg["thresholds"]
+    CFG.update(config.load())
+    th = CFG["thresholds"]
 
     lm = vision.FaceLandmarker.create_from_options(vision.FaceLandmarkerOptions(
         base_options=BaseOptions(model_asset_path=str(FACE_MODEL)),
         output_face_blendshapes=True, output_facial_transformation_matrixes=True, num_faces=1))
-    yolo = load_yolo(cfg)
-    cap = cv2.VideoCapture(cfg["camera"])
-    if not cap.isOpened():
-        raise SystemExit("Camera didn't open: allow OnDuty in System Settings › Privacy & Security › Camera.")
+    yolo = load_yolo(CFG)
+    cap = None
 
     hist: collections.deque[bool] = collections.deque(maxlen=max(1, int(th["window"] * a.fps)))
     phone_hist: collections.deque[bool] = collections.deque(maxlen=hist.maxlen)
@@ -233,23 +357,90 @@ def main() -> None:
         work_gaze.extend(calib["gaze"])
         log(f"calibration restored ({len(work_pitch)} samples)")
 
-    nag = Nagger(cfg, not a.no_voice)
-    streak_start, n_nags, last_seen_t, last_phone_t = None, 0, 0.0, 0.0
+    nag = Nagger(CFG, not a.no_voice)
+    streak_start, n_nags, last_seen_t, last_phone_t = None, 0, time.time(), 0.0
     last_down, last_face_t, last_dbg, last_save = False, 0.0, 0.0, time.time()
-    srv = ThreadingHTTPServer(("127.0.0.1", cfg["port"]), Dashboard)
+    mode, away, camera_ok = "active", False, False
+    srv = ThreadingHTTPServer(("127.0.0.1", CFG["port"]), Dashboard)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
-    log(f"on-duty running · dashboard http://localhost:{cfg['port']} · voice {nag.voice} · "
+    log(f"on-duty running · http://localhost:{CFG['port']}{'' if CFG['onboarded'] else '/setup'} · voice {nag.voice} · "
         f"phone detection {'on' if yolo else 'off'}")
+
+    def publish_sleep(m: str, why: str = "") -> None:
+        now = time.time()
+        STATE["status"] = {**STATE["status"], "t": int(now), "mode": m, "mode_why": why, "name": CFG["name"], "lang": CFG["lang"],
+                           "onboarded": CFG["onboarded"], "scrolling": False, "level": 0, "nags": 0, "phone_min": 0,
+                           "resume_at": STATE["pause_until"] and int(STATE["pause_until"]) or (next_on(dt.datetime.now()) if m == "offduty" else 0),
+                           "blur": STATE["blur"], "said": STATE["said"]}
 
     try:
         while True:
             t0 = time.time()
+            if STATE["reload"]:
+                STATE["reload"] = False
+                th = CFG["thresholds"]
+                nag.shut_up()
+                nag = Nagger(CFG, not a.no_voice)
+                yolo = (yolo or load_yolo(CFG)) if CFG["phone_detection"] else None
+                streak_start, n_nags = None, 0
+                log(f"config reloaded · tone {CFG['tone']} · voice {nag.voice}")
+
+            idle = idle_seconds()
+            if system_asleep():
+                new_mode, why = "asleep", "screen"
+            elif STATE["pause_until"] > t0:
+                new_mode, why = "paused", ""
+            elif CFG["onboarded"] and not work_window(dt.datetime.now())[0]:
+                new_mode, why = "offduty", work_window(dt.datetime.now())[1]
+            else:
+                if idle < 2:
+                    away = False
+                elif not streak_start and idle >= AWAY_IDLE and t0 - last_seen_t >= AWAY_NOFACE:
+                    away = True
+                new_mode, why = ("away", "idle") if away else ("active", "")
+            if STATE["pause_until"] and STATE["pause_until"] <= t0:
+                STATE["pause_until"] = 0.0
+            if new_mode != mode:
+                log(f"mode {mode} → {new_mode}{' (' + why + ')' if why else ''}")
+                mode = new_mode
+                if mode != "active":  # camera light off, speech off, streak closed without a welcome
+                    nag.shut_up()
+                    streak_start, n_nags = None, 0
+                    if cap:
+                        cap.release()
+                        cap = None
+                    camera_ok = False
+                    STATE["jpeg"] = BLANK
+                else:
+                    last_seen_t = t0
+                    hist.clear()
+                    phone_hist.clear()
+            if mode != "active":
+                publish_sleep(mode, why)
+                pu = STATE["pause_until"]
+                for _ in range(SLEEP_POLL[mode]):  # wake early on config / pause changes
+                    if STATE["reload"] or STATE["pause_until"] != pu:
+                        break
+                    time.sleep(1)
+                continue
+
+            if cap is None:
+                cap = cv2.VideoCapture(CFG["camera"])
+                if not cap.isOpened():
+                    cap = None
+                    if camera_ok is not None:
+                        log("Camera didn't open: allow OnDuty in System Settings › Privacy & Security › Camera.")
+                    camera_ok = None
+                    STATE["status"] = {**STATE["status"], "t": int(t0), "mode": "active", "camera_ok": False, "lang": CFG["lang"],
+                                       "onboarded": CFG["onboarded"], "name": CFG["name"], "said": STATE["said"], "blur": STATE["blur"]}
+                    time.sleep(3)
+                    continue
             ok, frame = cap.read()
             if not ok:
                 time.sleep(1)
                 continue
+            camera_ok = True
 
-            idle = idle_seconds()
             pose = head_pose(lm, frame)
             phone_boxes = []
             if yolo:
@@ -292,7 +483,7 @@ def main() -> None:
                 log(f"✅ back ({mins:.1f} min on the phone, {n_nags} lines) {said}")
                 db.record("back", start=int(streak_start), minutes=round(mins, 2), n=n_nags, said=said)
                 streak_start, n_nags = None, 0
-            elif (phone_now or face_now) and not streak_start:
+            elif CFG["onboarded"] and (phone_now or face_now) and not streak_start:  # the wizard never nags
                 streak_start = now - (2 if phone_now else th["window"] * th["down_ratio"])
             if streak_start and now - last_seen_t < 20 and nag.ready(n_nags + 1):
                 # keeps talking until you're back (pauses if you walked away from the camera)
@@ -304,8 +495,8 @@ def main() -> None:
 
             if STATE["test"]:
                 STATE["test"] = False
-                lv = random.randrange(5)
-                log(f"📵 test (level {lv + 1}): {nag.say(random.choice(nag.levels[lv]), lv, 3, 7, kind="test")}")
+                lv = random.randrange(nag.tone["start"], nag.tone["cap"] + 1)
+                log(f"📵 test (level {lv + 1}): {nag.say(random.choice(nag.levels[lv]), lv, 3, 7, kind='test')}")
             if now - last_save >= 60 and work_pitch:  # persist posture so restarts don't recalibrate
                 last_save = now
                 db.put("calibration", {"pitch": list(work_pitch)[-300:], "gaze": list(work_gaze)[-300:]})
@@ -316,7 +507,8 @@ def main() -> None:
                     f"phone={'y' if phone_boxes else 'n'} down={ratio:.0%} idle={idle:.0f}s")
 
             STATE["status"] = {
-                "t": int(now), "name": cfg["name"], "lang": cfg["lang"], "face": bool(pose),
+                "t": int(now), "mode": "active", "mode_why": "", "resume_at": 0, "camera_ok": True, "onboarded": CFG["onboarded"],
+                "name": CFG["name"], "lang": CFG["lang"], "face": bool(pose),
                 "dpitch": dpitch, "gaze": gaze, "gaze_base": gbase, "down": down, "face_down": face_down,
                 "phone": bool(phone_boxes), "phone_on": yolo is not None,
                 "phone_ratio": round(sum(phone_hist) / len(phone_hist), 2), "down_ratio": round(ratio, 2),
@@ -339,7 +531,8 @@ def main() -> None:
     except KeyboardInterrupt:
         pass
     finally:
-        cap.release()
+        if cap:
+            cap.release()
 
 
 if __name__ == "__main__":
