@@ -1,53 +1,185 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>on-duty</title>
+<link rel="icon" href="/logo.svg">
 <style>
-  :root { --bg:#f6f6f4; --card:#fff; --fg:#1b1b1a; --mute:#77756f; --line:#e4e2dc;
-          --ok:#1f8a4c; --warn:#c77b0a; --bad:#d23a2f; --acc:#3b6fd4; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#141413; --card:#1e1e1c; --fg:#ecebe6; --mute:#9a988f; --line:#2f2e2b; } }
+  :root { --bg:#f4f3ef; --card:#fff; --fg:#1b1b1a; --mute:#77756f; --line:#e4e2dc;
+          --ok:#1f8a4c; --warn:#c77b0a; --bad:#d23a2f; --acc:#3b6fd4;
+          --c1:#0f766e; --c2:#22c55e; --font:"Avenir Next","SF Pro Rounded",ui-rounded,system-ui,sans-serif; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0e0e0d; --card:#1a1a18; --fg:#ecebe6; --mute:#9a988f; --line:#2c2b28; } }
   * { box-sizing:border-box }
-  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.4 -apple-system, system-ui, sans-serif; }
-  main { max-width:980px; margin:0 auto; padding:24px 16px; display:grid; gap:16px; grid-template-columns: 480px 1fr; }
-  @media (max-width: 860px) { main { grid-template-columns:1fr } }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; }
-  h1 { grid-column:1/-1; margin:0; font-size:20px; display:flex; align-items:center; gap:12px; }
-  .pill { font-size:13px; font-weight:600; padding:4px 10px; border-radius:99px; color:#fff; background:var(--mute); }
-  img { width:100%; border-radius:10px; display:block; background:#000; aspect-ratio:4/3; object-fit:cover; }
-  .big { font-size:28px; font-weight:700; margin:4px 0 12px; }
-  .grid { display:grid; grid-template-columns: repeat(2, 1fr); gap:10px; }
-  .m { border:1px solid var(--line); border-radius:10px; padding:10px; }
-  .m b { display:block; font-size:20px; font-variant-numeric:tabular-nums; }
-  .m span { color:var(--mute); font-size:12px; }
-  .bar { height:6px; background:var(--line); border-radius:3px; margin-top:6px; overflow:hidden; }
-  .bar i { display:block; height:100%; background:var(--acc); }
-  canvas { width:100%; height:110px; display:block; }
-  ul { list-style:none; padding:0; margin:0; font-size:14px; max-height:160px; overflow:auto; }
-  li { padding:4px 0; border-bottom:1px solid var(--line); }
-  button { font:inherit; border:1px solid var(--line); background:var(--card); color:var(--fg);
-           border-radius:8px; padding:6px 12px; cursor:pointer; margin-left:auto; }
-  .hint { color:var(--mute); font-size:12px; margin-top:8px; }
-  .legend { display:flex; gap:12px; font-size:12px; color:var(--mute); margin-bottom:4px; }
-  .legend i { display:inline-block; width:10px; height:3px; vertical-align:middle; margin-right:4px; }
-  .hist { grid-column:1/-1 }
-  .logo { width:32px; height:32px }
-  t { display:inline }
-  .row { display:flex; align-items:baseline; gap:10px; margin-bottom:12px }
-  .kpis { display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-bottom:14px }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.4 var(--font); }
+  button { font:inherit; border:1px solid var(--line); background:var(--card); color:var(--fg); border-radius:99px;
+           padding:7px 14px; cursor:pointer; transition:transform .12s, box-shadow .12s; }
+  button:hover { transform:translateY(-1px); box-shadow:0 4px 14px #0002 }
+  main { max-width:1080px; margin:0 auto; padding:18px 16px 60px; display:grid; gap:16px; }
+  header { display:flex; align-items:center; gap:10px; flex-wrap:wrap }
+  header .logo { width:34px; height:34px }
+  header h1 { margin:0; font-size:20px; letter-spacing:-.02em }
+  .pill { font-size:12px; font-weight:700; padding:4px 10px; border-radius:99px; color:#fff; background:var(--mute); text-transform:uppercase; letter-spacing:.04em }
+  header .sp { flex:1 }
+  #photo { background:linear-gradient(135deg,var(--c1),var(--c2)); color:#fff; border:0; font-weight:700 }
+  #photo.hot { animation:pulse 1s infinite }
+  @keyframes pulse { 50% { transform:scale(1.08); box-shadow:0 0 0 8px #ff3b3033 } }
+
+  /* ---------- stage ---------- */
+  .stage { position:relative; overflow:hidden; border-radius:26px; color:#fff; min-height:520px; padding:28px;
+           display:grid; grid-template-columns: minmax(260px,420px) 1fr; gap:28px; align-items:center;
+           background:linear-gradient(135deg,var(--c1),var(--c2)); transition:background .8s; isolation:isolate;
+           box-shadow:0 20px 60px -20px var(--c1); }
+  .stage::before { content:""; position:absolute; inset:-50%; z-index:-1; opacity:.16;
+           background:repeating-linear-gradient(45deg,#fff 0 2px,transparent 2px 22px); animation:drift 20s linear infinite }
+  .stage::after { content:""; position:absolute; inset:0; z-index:-1;
+           background:radial-gradient(60% 70% at 75% 20%,#ffffff40,transparent 70%) }
+  @keyframes drift { to { transform:translate(44px,44px) } }
+  .stage.shake { animation:shake .5s infinite }
+  .stage.shake5 { animation:shake .22s infinite }
+  @keyframes shake { 0%,100% { transform:translate(0) } 25% { transform:translate(-3px,2px) } 50% { transform:translate(3px,-2px) } 75% { transform:translate(-2px,-3px) } }
+  @media (max-width: 820px) { .stage { grid-template-columns:1fr; padding:18px } }
+
+  .polaroid { background:#fff; padding:12px 12px 0; border-radius:6px; box-shadow:0 18px 40px #0006, 0 2px 0 #fff8 inset;
+              transform:rotate(-2.5deg); transition:transform .5s; position:relative; color:#222; max-width:420px; width:100%; justify-self:center }
+  .polaroid:hover { transform:rotate(0) scale(1.02) }
+  .polaroid img { width:100%; aspect-ratio:4/3; object-fit:cover; display:block; background:#111; border-radius:2px }
+  .polaroid .cap { font:700 22px/1 "Marker Felt","Bradley Hand","Segoe Print",cursive; padding:14px 6px 16px; display:flex; justify-content:space-between; gap:8px }
+  .polaroid .cap span:last-child { opacity:.55; font-size:17px; align-self:center }
+  .stamp { position:absolute; right:-14px; top:20px; transform:rotate(12deg); border:4px solid var(--stampc,#16a34a); color:var(--stampc,#16a34a);
+           background:#fffd; font:900 22px/1 var(--font); letter-spacing:.06em; padding:6px 12px; border-radius:8px; text-transform:uppercase;
+           transition:.4s; mix-blend-mode:normal; }
+  .stamp.bad { animation:stampIn .35s cubic-bezier(.2,2,.4,1) }
+  @keyframes stampIn { from { transform:rotate(12deg) scale(2.4); opacity:0 } }
+
+  .talk { display:grid; gap:14px; justify-items:start; min-width:0 }
+  .mascot { width:170px; height:110px; overflow:visible; filter:drop-shadow(0 8px 14px #0004); }
+  .mascot .pupil { transition:transform .35s cubic-bezier(.3,1.6,.5,1) }
+  .mascot .brow { transform-box:fill-box; transform-origin:center; transition:transform .35s }
+  .mascot.idle .pupil { animation:look 6s ease-in-out infinite }
+  @keyframes look { 0%,100% { transform:translate(0,-1px) } 30% { transform:translate(6px,0) } 65% { transform:translate(-6px,1px) } }
+  .mascot.blink .lid { animation:blink 4s infinite }
+  @keyframes blink { 0%,94%,100% { transform:scaleY(0) } 97% { transform:scaleY(1) } }
+  .lid { transform-box:fill-box; transform-origin:top; transform:scaleY(0) }
+
+  .bubble { position:relative; background:#fff; color:#17171a; border-radius:26px; padding:20px 26px; max-width:100%; min-width:min(100%,320px);
+            box-shadow:0 14px 34px #0004; }
+  .bubble::before { content:""; position:absolute; top:-14px; left:60px; border:14px solid transparent; border-top:0; border-bottom-color:#fff }
+  .bubble.pop { animation:pop .35s cubic-bezier(.2,1.8,.4,1) }
+  @keyframes pop { from { transform:scale(.85) rotate(-1.5deg); opacity:.3 } }
+  #line { margin:0; font:800 36px/1.18 var(--font); letter-spacing:-.02em; overflow-wrap:anywhere; min-height:1.2em }
+  #line.caret::after { content:"▍"; animation:caret .7s steps(1) infinite; color:var(--c1) }
+  @keyframes caret { 50% { opacity:0 } }
+  .glitch #line { text-shadow:2px 0 #ff2d55, -2px 0 #00e5ff; animation:glitch 1.2s infinite }
+  @keyframes glitch { 0%,90%,100% { transform:none } 92% { transform:translate(3px,-2px) skewX(-6deg) } 95% { transform:translate(-3px,2px) } }
+  .bmeta { margin-top:10px; font-size:13px; font-weight:700; color:#6b6b72; text-transform:uppercase; letter-spacing:.06em }
+
+  .hud { display:flex; gap:22px; align-items:center; flex-wrap:wrap }
+  .clock b { display:block; font:800 54px/1 ui-monospace,"SF Mono",monospace; letter-spacing:-.04em; text-shadow:0 4px 18px #0004 }
+  .clock span { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; opacity:.85 }
+  .pips { display:flex; gap:6px }
+  .pips i { width:30px; height:12px; border-radius:6px; background:#fff4; transition:.3s }
+  .pips i.on { background:#fff; box-shadow:0 0 14px #fff9 }
+  .lvname { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; margin-top:6px; opacity:.9 }
+  .rain { position:absolute; top:-40px; font-size:28px; pointer-events:none; animation:fall linear forwards; z-index:0 }
+  @keyframes fall { to { transform:translateY(640px) rotate(360deg); opacity:.3 } }
+  #fx { position:fixed; inset:0; width:100%; height:100%; pointer-events:none; z-index:50 }
+
+  /* ---------- cards ---------- */
+  .card { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:16px }
+  .kpis { display:grid; grid-template-columns:repeat(6,1fr); gap:10px }
   @media (max-width: 860px) { .kpis { grid-template-columns:repeat(2,1fr) } .two { grid-template-columns:1fr !important } }
-  .kpis b { font-size:26px }
+  .m { border:1px solid var(--line); border-radius:12px; padding:12px; background:var(--card) }
+  .m b { display:block; font-size:24px; font-variant-numeric:tabular-nums; letter-spacing:-.02em }
+  .m span { color:var(--mute); font-size:12px }
+  .hint { color:var(--mute); font-size:12px }
   .two { display:grid; grid-template-columns:1fr 1fr; gap:16px }
-  .two canvas { height:140px }
+  canvas.ch { width:100%; height:140px; display:block }
+  .sec-h { display:flex; align-items:baseline; gap:10px; margin-bottom:10px }
+  .sec-h b { font-size:16px }
+  .shame { display:grid; gap:8px }
+  .shame button { display:flex; gap:12px; align-items:center; text-align:left; border-radius:14px; padding:12px 14px; width:100% }
+  .shame .lv { font:800 12px var(--font); color:#fff; border-radius:8px; padding:3px 8px; flex:none }
+  .shame .tx { flex:1; font-weight:600 }
+  .shame .sh { opacity:.5; flex:none }
+  details.sig > summary { cursor:pointer; font-weight:700; padding:2px 0 }
+  .grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:12px }
+  .bar { height:6px; background:var(--line); border-radius:3px; margin-top:6px; overflow:hidden }
+  .bar i { display:block; height:100%; background:var(--acc) }
+  .legend { display:flex; gap:12px; font-size:12px; color:var(--mute); margin:12px 0 4px; flex-wrap:wrap }
+  .legend i { display:inline-block; width:10px; height:3px; vertical-align:middle; margin-right:4px }
+  ul { list-style:none; padding:0; margin:0; font-size:14px; max-height:160px; overflow:auto }
+  li { padding:4px 0; border-bottom:1px solid var(--line) }
+  #chart { width:100%; height:110px; display:block }
+
+  /* ---------- modal + toast ---------- */
+  #modal { position:fixed; inset:0; background:#000c; display:none; place-items:center; z-index:100; padding:16px }
+  #modal.on { display:grid }
+  #modal .box { background:var(--card); border-radius:20px; padding:16px; display:grid; gap:12px; max-height:96vh; justify-items:center }
+  #modal img { max-height:72vh; max-width:100%; border-radius:12px; box-shadow:0 10px 40px #0008 }
+  #modal .acts { display:flex; gap:8px; flex-wrap:wrap; justify-content:center }
+  #modal .acts .primary { background:var(--fg); color:var(--bg) }
+  #toast { position:fixed; bottom:22px; left:50%; transform:translate(-50%,80px); background:#111; color:#fff; padding:10px 18px; border-radius:99px;
+           font-weight:700; transition:.35s; z-index:90; box-shadow:0 8px 30px #0006 }
+  #toast.on { transform:translate(-50%,0) }
+  @media (prefers-reduced-motion: reduce) { *, *::before { animation:none !important } }
 </style>
 </head>
 <body>
+<canvas id="fx"></canvas>
 <main>
-  <h1><img src="/logo.svg" alt="" class="logo">on-duty <span class="pill" id="pill">…</span><button id="blur" data-i="blur" style="margin-left:auto"></button><button id="test" data-i="test" style="margin-left:0"></button></h1>
-  <div class="card"><img id="cam" alt=""><div class="hint" id="age"></div></div>
-  <div class="card">
-    <div class="big" id="headline">…</div>
+  <header>
+    <img src="/logo.svg" alt="" class="logo"><h1>on-duty</h1><span class="pill" id="pill">…</span><span class="sp"></span>
+    <button id="blur" data-i="blur"></button><button id="test" data-i="test"></button><button id="photo" data-i="photo"></button>
+  </header>
+
+  <section class="stage" id="stage">
+    <div class="polaroid" id="polaroid">
+      <img id="cam" alt="">
+      <div class="stamp" id="stamp"></div>
+      <div class="cap"><span id="capName"></span><span id="capTime"></span></div>
+    </div>
+    <div class="talk">
+      <svg class="mascot idle blink" id="mascot" viewBox="0 0 200 130" aria-hidden="true">
+        <defs><clipPath id="clipL"><ellipse cx="60" cy="62" rx="34" ry="30"/></clipPath><clipPath id="clipR"><ellipse cx="140" cy="62" rx="34" ry="30"/></clipPath></defs>
+        <ellipse cx="60" cy="62" rx="34" ry="30" fill="#fff"/><ellipse cx="140" cy="62" rx="34" ry="30" fill="#fff"/>
+        <g class="pupil" id="pupL"><circle cx="60" cy="62" r="14" fill="#18181b"/><circle cx="55" cy="56" r="4.5" fill="#fff"/></g>
+        <g class="pupil" id="pupR"><circle cx="140" cy="62" r="14" fill="#18181b"/><circle cx="135" cy="56" r="4.5" fill="#fff"/></g>
+        <g clip-path="url(#clipL)"><rect class="lid" x="20" y="30" width="80" height="64" fill="#18181b"/></g>
+        <g clip-path="url(#clipR)"><rect class="lid" x="100" y="30" width="80" height="64" fill="#18181b"/></g>
+        <rect class="brow" id="browL" x="28" y="18" width="58" height="9" rx="4.5" fill="#18181b"/>
+        <rect class="brow" id="browR" x="114" y="18" width="58" height="9" rx="4.5" fill="#18181b"/>
+        <path id="mouth" d="M75 112 Q100 124 125 112" fill="none" stroke="#18181b" stroke-width="7" stroke-linecap="round"/>
+      </svg>
+      <div class="bubble" id="bubble"><p id="line"></p><div class="bmeta" id="lmeta"></div></div>
+      <div class="hud">
+        <div class="clock"><span id="clockLbl"></span><b id="clock">0:00</b></div>
+        <div><div class="pips" id="pips"><i></i><i></i><i></i><i></i><i></i></div><div class="lvname" id="lvname"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="kpis">
+    <div class="m"><span data-i="k_streak"></span><b id="k-streak">–</b></div>
+    <div class="m"><span data-i="k_min"></span><b id="k-min">–</b></div>
+    <div class="m"><span data-i="k_n"></span><b id="k-n">–</b></div>
+    <div class="m"><span data-i="k_al"></span><b id="k-al">–</b></div>
+    <div class="m"><span data-i="k_max"></span><b id="k-max">–</b></div>
+    <div class="m"><span data-i="k_wk"></span><b id="k-wk">–</b></div>
+  </section>
+
+  <section class="card">
+    <div class="sec-h"><b data-i="shame"></b><span class="hint" data-i="shame_sub"></span></div>
+    <div class="shame" id="shame"></div>
+  </section>
+
+  <section class="card two">
+    <div><div class="hint" data-i="byhour"></div><canvas class="ch" id="byhour"></canvas></div>
+    <div><div class="hint" data-i="byday"></div><canvas class="ch" id="byday"></canvas></div>
+  </section>
+
+  <details class="card sig" id="sig">
+    <summary data-i="signals"></summary>
     <div class="grid">
       <div class="m"><span data-i="head"></span><b id="dp">–</b><span id="dpt"></span></div>
       <div class="m"><span data-i="gaze"></span><b id="gz">–</b><span id="gzt"></span></div>
@@ -55,84 +187,212 @@
       <div class="m"><span data-i="idlelbl"></span><b id="idle">–</b><div class="bar"><i id="idleb"></i></div></div>
       <div class="m" style="grid-column:1/-1"><span data-i="phonelbl"></span><b id="ph">–</b><span id="pht"></span></div>
     </div>
-    <div class="hint" id="calib"></div>
-  </div>
-  <div class="card">
+    <div class="hint" id="calib" style="margin-top:8px"></div>
     <div class="legend"><span><i style="background:var(--acc)"></i><t data-i="lg_head"></t></span><span><i style="background:var(--warn)"></i><t data-i="lg_gaze"></t></span><span><i style="background:var(--bad);height:8px;opacity:.25"></i><t data-i="lg_down"></t></span><span><i style="background:var(--bad);height:8px;width:8px;border-radius:4px"></i><t data-i="lg_phone"></t></span></div>
     <canvas id="chart"></canvas>
     <div class="hint" data-i="chart_hint"></div>
-  </div>
-  <section class="card hist">
-    <div class="row"><b data-i="history"></b><span class="hint" id="hsub"></span></div>
-    <div class="kpis">
-      <div class="m"><span data-i="k_min"></span><b id="k-min">–</b></div>
-      <div class="m"><span data-i="k_n"></span><b id="k-n">–</b></div>
-      <div class="m"><span data-i="k_al"></span><b id="k-al">–</b></div>
-      <div class="m"><span data-i="k_max"></span><b id="k-max">–</b></div>
-      <div class="m"><span data-i="k_wk"></span><b id="k-wk">–</b></div>
-      <div class="m"><span data-i="k_avg"></span><b id="k-avg">–</b></div>
-    </div>
-    <div class="two">
-      <div><div class="hint" data-i="byhour"></div><canvas id="byhour"></canvas></div>
-      <div><div class="hint" data-i="byday"></div><canvas id="byday"></canvas></div>
-    </div>
-    <div class="hint" style="margin-top:12px" data-i="recent"></div>
-    <ul id="sess"></ul>
-  </section>
-  <div class="card"><b data-i="events"></b><ul id="ev"></ul></div>
+    <div style="margin-top:12px"><b data-i="events"></b><ul id="ev"></ul></div>
+  </details>
 </main>
+
+<div id="modal"><div class="box"><img id="shot" alt=""><div class="acts">
+  <button class="primary" id="dl" data-i="download"></button><button id="cp" data-i="copy"></button><button id="sh" data-i="share"></button><button id="close" data-i="close"></button>
+</div></div></div>
+<div id="toast"></div>
+
 <script>
 const $ = id => document.getElementById(id);
-const STR = {
-  pt_BR: {
-    blur:'Borrar câmera', unblur:'Mostrar câmera', test:'Testar alerta', head:'Cabeça vs. seu normal', gaze:'Olhar pra baixo vs. normal',
-    downwin:'Olhando pra baixo (janela)', idlelbl:'Sem teclado/mouse', phonelbl:'Celular na câmera (YOLO)',
-    lg_head:'cabeça (°)', lg_gaze:'olhar ×40', lg_down:'pra baixo', lg_phone:'celular visto',
-    chart_hint:'últimos 2 min · linha tracejada = limiar da cabeça', history:'Histórico', k_min:'Hoje no celular',
-    k_n:'Vezes que pegou hoje', k_al:'Alertas hoje', k_max:'Maior sessão hoje', k_wk:'Últimos 7 dias', k_avg:'Média por dia (7d)',
-    byhour:'minutos no celular por hora · hoje', byday:'minutos no celular por dia · 14 dias', recent:'sessões recentes', events:'Eventos',
-    connecting:'conectando…', calibrating:'calibrando', calibrating_msg:'Digita uns 10 s pra eu aprender sua postura',
-    on_phone:'NO CELULAR', on_phone_msg:(m,l,n)=>`📵 no celular há ${m} min · nível ${l}/5 · fala ${n}`,
-    phone_seen:'celular à vista', phone_seen_msg:'📱 tô vendo um celular aí…', looking_down:'olhando pra baixo', looking_down_msg:'olhando pra baixo…',
-    no_face:'sem rosto', no_face_msg:'não estou vendo seu rosto', working:'trabalhando', working_msg:'✅ de olho na tela',
-    alert_above:v=>`alerta acima de +${v}°`, gaze_above:v=>`alerta acima de +${v}`, off:'desligado', visible:'📱 visível agora', no:'não',
-    seen_in:p=>` · visto em ${p}% da janela`, calib:(n,c)=>`postura aprendida com ${n} amostras · gatilho: celular visto + ${c.phone_idle} s sem teclado (imediato) OU pra baixo ≥ ${c.down_ratio*100}% dos últimos ${c.window} s + ${c.idle} s sem teclado · só para quando você volta a digitar`,
-    none_yet:'nada ainda', updated:s=>`atualizado ${s} s atrás`, offline:'serviço fora do ar', offline_pill:'offline',
-    sessions:n=>`${n} sessões registradas`, via_phone:n=>`${n} via 📱`, no_sessions:'nenhuma sessão ainda',
-    on_phone_row:(m,a)=>`<b>${m}</b> no celular · ${a} alerta${a===1?'':'s'}`, sec:'s', min:'min', h:'h'},
-  en_US: {
-    blur:'Blur camera', unblur:'Show camera', test:'Test alert', head:'Head vs. your normal', gaze:'Looking down vs. normal',
-    downwin:'Looking down (window)', idlelbl:'No keyboard/mouse', phonelbl:'Phone in camera (YOLO)',
-    lg_head:'head (°)', lg_gaze:'gaze ×40', lg_down:'looking down', lg_phone:'phone seen',
-    chart_hint:'last 2 min · dashed line = head threshold', history:'History', k_min:'On phone today',
-    k_n:'Times today', k_al:'Alerts today', k_max:'Longest session today', k_wk:'Last 7 days', k_avg:'Daily average (7d)',
-    byhour:'minutes on phone per hour · today', byday:'minutes on phone per day · 14 days', recent:'recent sessions', events:'Events',
-    connecting:'connecting…', calibrating:'calibrating', calibrating_msg:'Type for ~10 s so I can learn your posture',
-    on_phone:'ON PHONE', on_phone_msg:(m,l,n)=>`📵 on the phone for ${m} min · level ${l}/5 · line ${n}`,
-    phone_seen:'phone in view', phone_seen_msg:'📱 I see a phone there…', looking_down:'looking down', looking_down_msg:'looking down…',
-    no_face:'no face', no_face_msg:"I can't see your face", working:'working', working_msg:'✅ eyes on the screen',
-    alert_above:v=>`alert above +${v}°`, gaze_above:v=>`alert above +${v}`, off:'off', visible:'📱 visible now', no:'no',
-    seen_in:p=>` · seen in ${p}% of the window`, calib:(n,c)=>`posture learned from ${n} samples · trigger: phone seen + ${c.phone_idle} s without keyboard (instant) OR looking down ≥ ${c.down_ratio*100}% of the last ${c.window} s + ${c.idle} s without keyboard · stops only when you type again`,
-    none_yet:'nothing yet', updated:s=>`updated ${s} s ago`, offline:'service is down', offline_pill:'offline',
-    sessions:n=>`${n} sessions recorded`, via_phone:n=>`${n} via 📱`, no_sessions:'no sessions yet',
-    on_phone_row:(m,a)=>`<b>${m}</b> on phone · ${a} alert${a===1?'':'s'}`, sec:'s', min:'min', h:'h'},
-};
-let LANG = 'pt_BR', L = STR.pt_BR;
-function setLang(l) {
-  if (!STR[l] || l === LANG && document.documentElement.dataset.set) return;
-  LANG = l; L = STR[l]; document.documentElement.dataset.set = 1; document.documentElement.lang = l.replace('_', '-');
-  document.querySelectorAll('[data-i]').forEach(e => { const v = L[e.dataset.i]; if (typeof v === 'string') e.textContent = v; });
-  $('headline').textContent = L.connecting;
-}
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const fmt = (v, d=1) => v == null ? '–' : (v > 0 ? '+' : '') + v.toFixed(d);
+const PAL = [  // 0 = back, 1..5 = nag level
+  ['#0f766e', '#22c55e'], ['#d97706', '#f59e0b'], ['#ea580c', '#f97316'], ['#dc2626', '#f43f5e'], ['#9d174d', '#7e22ce'], ['#111113', '#e11d48']];
+const WORK = ['#0f766e', '#2563eb'], WATCH = ['#b45309', '#f59e0b'], CALIB = ['#334155', '#64748b'], AWAY = ['#3f3f46', '#71717a'];
+
+const STR = {
+  pt_BR: {
+    blur:'Borrar câmera', unblur:'Mostrar câmera', test:'Testar alerta', photo:'📸 Tirar foto', download:'Baixar', copy:'Copiar', share:'Compartilhar', close:'Fechar',
+    head:'Cabeça vs. seu normal', gaze:'Olhar pra baixo vs. normal', downwin:'Olhando pra baixo (janela)', idlelbl:'Sem teclado/mouse', phonelbl:'Celular na câmera (YOLO)',
+    lg_head:'cabeça (°)', lg_gaze:'olhar ×40', lg_down:'pra baixo', lg_phone:'celular visto', signals:'Sinais e detalhes', events:'Eventos',
+    chart_hint:'últimos 2 min · linha tracejada = limiar da cabeça',
+    k_streak:'Sem celular há', k_min:'Hoje no celular', k_n:'Vezes que pegou hoje', k_al:'Broncas hoje', k_max:'Maior sessão hoje', k_wk:'Últimos 7 dias',
+    shame:'Hall da vergonha', shame_sub:'as falas mais pesadas de hoje · toque pra virar foto', no_shame:'Nada ainda. Continue assim (ou não).',
+    byhour:'minutos no celular por hora · hoje', byday:'minutos no celular por dia · 14 dias',
+    connecting:'conectando…', offline:'serviço fora do ar', offline_pill:'offline',
+    st_calib:'calibrando', st_phone:'no celular', st_seen:'celular à vista', st_down:'olhando pra baixo', st_away:'sem rosto', st_work:'trabalhando',
+    idle_work:n=>`Tô de olho${n ? ', ' + n : ''}. 👀`, idle_calib:'Digita um pouquinho que eu aprendo sua postura.', idle_seen:'Eu vi esse celular aí…', idle_down:'Olhando pra baixo, hein…', idle_away:'Cadê você? Não tô te vendo.',
+    stamp_phone:'NO CELULAR', stamp_work:'EM SERVIÇO', stamp_seen:'SUSPEITO', stamp_away:'AUSENTE', stamp_calib:'CALIBRANDO',
+    clock_phone:'no celular há', clock_free:'sem celular há', lvl:['gentil','sarcástico','cobrança','drama','caos'], lvl_of:l=>`nível ${l}/5`,
+    back_meta:m=>`voltou depois de ${m}`, test_meta:'teste', toast_photo:'Essa merece uma foto 📸', toast_copied:'Copiado! Cola no story 😈', toast_saved:'Salvo!', toast_nocopy:'Seu navegador não deixou copiar — baixa a imagem.',
+    alert_above:v=>`alerta acima de +${v}°`, gaze_above:v=>`alerta acima de +${v}`, off:'desligado', visible:'📱 visível agora', no:'não',
+    seen_in:p=>` · visto em ${p}% da janela`, calib:(n,c)=>`postura aprendida com ${n} amostras · gatilho: celular visto + ${c.phone_idle} s sem teclado OU pra baixo ≥ ${c.down_ratio*100}% dos últimos ${c.window} s + ${c.idle} s sem teclado · só para quando você volta a digitar`,
+    none_yet:'nada ainda', via_phone:n=>`${n} via 📱`, sec:'s', min:'min', h:'h',
+    card_caught:'PEGO NO FLAGRA', card_back:'DE VOLTA AO JOGO', card_on:m=>`${m} no celular`, card_stamp:'NO CELULAR', card_stamp_back:'REABILITADO', card_foot:'on-duty · github.com/valvesss/on-duty-ai'},
+  en_US: {
+    blur:'Blur camera', unblur:'Show camera', test:'Test alert', photo:'📸 Snap', download:'Download', copy:'Copy', share:'Share', close:'Close',
+    head:'Head vs. your normal', gaze:'Looking down vs. normal', downwin:'Looking down (window)', idlelbl:'No keyboard/mouse', phonelbl:'Phone in camera (YOLO)',
+    lg_head:'head (°)', lg_gaze:'gaze ×40', lg_down:'looking down', lg_phone:'phone seen', signals:'Signals & details', events:'Events',
+    chart_hint:'last 2 min · dashed line = head threshold',
+    k_streak:'Phone-free for', k_min:'On phone today', k_n:'Times today', k_al:'Scoldings today', k_max:'Longest session today', k_wk:'Last 7 days',
+    shame:'Hall of shame', shame_sub:"today's heaviest lines · tap to make it a photo", no_shame:'Nothing yet. Keep it up (or not).',
+    byhour:'minutes on phone per hour · today', byday:'minutes on phone per day · 14 days',
+    connecting:'connecting…', offline:'service is down', offline_pill:'offline',
+    st_calib:'calibrating', st_phone:'on phone', st_seen:'phone in view', st_down:'looking down', st_away:'no face', st_work:'working',
+    idle_work:n=>`Watching you${n ? ', ' + n : ''}. 👀`, idle_calib:'Type a little so I can learn your posture.', idle_seen:'I saw that phone…', idle_down:'Looking down, huh…', idle_away:"Where are you? I can't see you.",
+    stamp_phone:'ON PHONE', stamp_work:'ON DUTY', stamp_seen:'SUSPICIOUS', stamp_away:'AWAY', stamp_calib:'CALIBRATING',
+    clock_phone:'on the phone for', clock_free:'phone-free for', lvl:['gentle','sarcastic','firm','drama','chaos'], lvl_of:l=>`level ${l}/5`,
+    back_meta:m=>`back after ${m}`, test_meta:'test', toast_photo:'This one deserves a photo 📸', toast_copied:'Copied! Paste it in your story 😈', toast_saved:'Saved!', toast_nocopy:"Your browser wouldn't copy — download the image.",
+    alert_above:v=>`alert above +${v}°`, gaze_above:v=>`alert above +${v}`, off:'off', visible:'📱 visible now', no:'no',
+    seen_in:p=>` · seen in ${p}% of the window`, calib:(n,c)=>`posture learned from ${n} samples · trigger: phone seen + ${c.phone_idle} s without keyboard OR looking down ≥ ${c.down_ratio*100}% of the last ${c.window} s + ${c.idle} s without keyboard · stops only when you type again`,
+    none_yet:'nothing yet', via_phone:n=>`${n} via 📱`, sec:'s', min:'min', h:'h',
+    card_caught:'CAUGHT RED-HANDED', card_back:'BACK IN THE GAME', card_on:m=>`${m} on the phone`, card_stamp:'ON PHONE', card_stamp_back:'REHABILITATED', card_foot:'on-duty · github.com/valvesss/on-duty-ai'},
+};
+let LANG = 'pt_BR', L = STR.pt_BR, NAME = '';
+function setLang(l) {
+  if (!STR[l] || document.documentElement.dataset.lang === l) return;
+  LANG = l; L = STR[l]; document.documentElement.dataset.lang = l; document.documentElement.lang = l.replace('_', '-');
+  document.querySelectorAll('[data-i]').forEach(e => { const v = L[e.dataset.i]; if (typeof v === 'string') e.textContent = v; });
+}
+const loc = () => LANG.replace('_', '-');
+const mins = m => m < 1 ? Math.round(m * 60) + ' ' + L.sec : m < 60 ? m.toFixed(1).replace('.0', '') + ' ' + L.min : (m / 60).toFixed(1) + ' ' + L.h;
+const clockFmt = ms => { const s = Math.max(0, Math.floor(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), ss = s % 60;
+  return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(ss).padStart(2, '0'); };
 
 $('test').onclick = () => fetch('/test', {method:'POST'});
 $('blur').onclick = () => fetch('/blur', {method:'POST'});
 
+/* ---------- toast + fx ---------- */
+let toastT;
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2600); }
+const fx = $('fx'), fg = fx.getContext('2d'); let parts = [];
+function resizeFx() { fx.width = innerWidth; fx.height = innerHeight; } resizeFx(); addEventListener('resize', resizeFx);
+function confetti() {
+  const cols = ['#22c55e', '#f59e0b', '#3b82f6', '#ec4899', '#facc15', '#a78bfa'];
+  for (let i = 0; i < 140; i++) parts.push({x:innerWidth / 2 + (Math.random() - .5) * 200, y:innerHeight * .45, vx:(Math.random() - .5) * 18, vy:-Math.random() * 16 - 4,
+    r:Math.random() * 6 + 4, c:cols[i % cols.length], a:Math.random() * 6, life:1});
+  if (parts.length === 140) loop();
+}
+function loop() {
+  fg.clearRect(0, 0, fx.width, fx.height);
+  parts = parts.filter(p => p.life > 0);
+  for (const p of parts) { p.x += p.vx; p.y += p.vy; p.vy += .45; p.vx *= .99; p.a += .2; p.life -= .008;
+    fg.save(); fg.globalAlpha = Math.max(0, p.life); fg.translate(p.x, p.y); fg.rotate(p.a); fg.fillStyle = p.c; fg.fillRect(-p.r, -p.r / 2, p.r * 2, p.r); fg.restore(); }
+  if (parts.length) requestAnimationFrame(loop); else fg.clearRect(0, 0, fx.width, fx.height);
+}
+function rain(emoji) {
+  const st = $('stage'); if (st.querySelectorAll('.rain').length > 14) return;
+  const e = document.createElement('span'); e.className = 'rain'; e.textContent = emoji;
+  e.style.left = Math.random() * 100 + '%'; e.style.animationDuration = 2.5 + Math.random() * 2 + 's'; e.style.fontSize = 20 + Math.random() * 24 + 'px';
+  st.appendChild(e); setTimeout(() => e.remove(), 5000);
+}
+
+/* ---------- mascot + stage ---------- */
+const FACE = { // pupil dx,dy · brow angle (deg) · brow dy · mouth path
+  work:  [0, -2, 0, 0, 'M75 110 Q100 126 125 110'], calib: [0, 0, 0, 0, 'M80 112 L120 112'], away: [0, 0, 8, 4, 'M80 114 Q100 108 120 114'],
+  seen:  [0, 10, 12, -4, 'M78 114 L122 114'], 1: [0, 14, 10, -2, 'M78 114 Q100 108 122 114'], 2: [0, 16, 16, 0, 'M76 116 Q100 106 124 116'],
+  3:     [0, 18, 24, 2, 'M72 118 Q100 100 128 118'], 4: [0, 20, 32, 4, 'M76 108 Q100 142 124 108 Z'], 5: [0, 22, 40, 6, 'M70 106 Q100 150 130 106 Z'],
+  back:  [0, -2, -8, -4, 'M70 108 Q100 134 130 108'],
+};
+function face(key) {
+  const [dx, dy, ang, bdy, mouth] = FACE[key] || FACE.work;
+  for (const id of ['pupL', 'pupR']) $(id).style.transform = `translate(${dx}px,${dy}px)`;
+  $('browL').style.transform = `translateY(${bdy}px) rotate(${ang}deg)`; $('browR').style.transform = `translateY(${bdy}px) rotate(${-ang}deg)`;
+  $('mouth').setAttribute('d', mouth);
+  $('mascot').classList.toggle('idle', key === 'work' || key === 'calib');
+}
+let cur = {key:null, lvl:-1};
+function setStage(key, lvl, pal) {
+  if (cur.key === key && cur.lvl === lvl) return;
+  cur = {key, lvl};
+  const r = document.documentElement.style; r.setProperty('--c1', pal[0]); r.setProperty('--c2', pal[1]);
+  face(key);
+  const st = $('stage');
+  st.classList.toggle('shake', lvl === 4); st.classList.toggle('shake5', lvl === 5);
+  st.classList.toggle('glitch', lvl >= 5);
+}
+let typeT = null, lastId = 0, lastLine = null, moment = null;
+function typeLine(text, meta) {
+  clearInterval(typeT);
+  const el = $('line'), b = $('bubble');
+  el.style.fontSize = text.length < 50 ? '40px' : text.length < 95 ? '33px' : '27px';
+  b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop');
+  $('lmeta').textContent = meta; el.classList.add('caret');
+  let i = 0; const step = Math.max(18, Math.min(55, 5200 / text.length));
+  typeT = setInterval(() => { el.textContent = text.slice(0, ++i); if (i >= text.length) { clearInterval(typeT); el.classList.remove('caret'); } }, step);
+}
+function showStatic(text) { // idle caption (not typed)
+  if (lastLine === text) return; lastLine = text; clearInterval(typeT);
+  $('line').style.fontSize = '30px'; $('line').textContent = text; $('line').classList.remove('caret'); $('lmeta').textContent = '';
+}
+async function grabFrame() { try { return await createImageBitmap(await (await fetch('/frame.jpg?' + Date.now())).blob()); } catch { return null; } }
+
+let phoneStart = 0, lastBackT = 0;
+function onSaid(s) {
+  const d = s.said; if (!d || d.id === lastId) return;
+  const first = lastId === 0; lastId = d.id;
+  if (first && Date.now() / 1000 - d.t > 25) return;  // old line from before the page opened
+  const meta = d.kind === 'back' ? L.back_meta(mins(d.minutes)) : d.kind === 'test' ? `${L.test_meta} · ${L.lvl_of(d.level)}` : `${L.lvl_of(d.level)} · ${L.lvl[d.level - 1]}`;
+  lastLine = null; typeLine(d.text, meta);
+  grabFrame().then(img => { moment = {img, text:d.text, level:d.kind === 'back' ? 0 : d.level, kind:d.kind, minutes:d.minutes, t:d.t}; });
+  if (d.kind === 'back') { confetti(); if (d.minutes >= 1) setTimeout(() => toast(L.toast_photo), 1200); }
+  if (d.kind !== 'back' && d.level >= 4) { $('photo').classList.add('hot'); toast(L.toast_photo); }
+}
+
+async function tick() {
+  try {
+    const s = await (await fetch('/status')).json();
+    const c = s.cfg || {}; NAME = s.name || ''; setLang(s.lang);
+    $('blur').textContent = s.blur ? L.unblur : L.blur;
+    const now = Date.now(), demo = !s.scrolling && s.said && s.said.kind === 'test' && now / 1000 - s.said.t < 9;
+    const lvl = demo ? s.said.level : s.scrolling ? Math.max(1, s.level) : 0;
+    let key, pal, st, stamp, stampc, idle;
+    if (!s.calibrated) { key = 'calib'; pal = CALIB; st = [L.st_calib, '--warn']; stamp = L.stamp_calib; stampc = '#64748b'; idle = L.idle_calib; }
+    else if (s.scrolling || demo) { key = lvl; pal = PAL[lvl]; st = [L.st_phone, '--bad']; stamp = L.stamp_phone; stampc = '#dc2626'; }
+    else if (s.phone) { key = 'seen'; pal = WATCH; st = [L.st_seen, '--warn']; stamp = L.stamp_seen; stampc = '#d97706'; idle = L.idle_seen; }
+    else if (s.down) { key = 'seen'; pal = WATCH; st = [L.st_down, '--warn']; stamp = L.stamp_seen; stampc = '#d97706'; idle = L.idle_down; }
+    else if (!s.face) { key = 'away'; pal = AWAY; st = [L.st_away, '--mute']; stamp = L.stamp_away; stampc = '#71717a'; idle = L.idle_away; }
+    else { key = 'work'; pal = WORK; st = [L.st_work, '--ok']; stamp = L.stamp_work; stampc = '#16a34a'; idle = L.idle_work(NAME); }
+    const recent = s.said && now / 1000 - s.said.t < 30 && s.said.kind !== 'test' || s.said && now / 1000 - s.said.t < 12;
+    if (s.said && s.said.kind === 'back' && now / 1000 - s.said.t < 20 && !s.scrolling) { key = 'back'; pal = PAL[0]; }
+    setStage(key, lvl, pal);
+    onSaid(s);
+    if (!recent && !s.scrolling && !demo) showStatic(idle || L.idle_work(NAME));
+    $('pill').textContent = st[0]; $('pill').style.background = css(st[1]);
+    const stp = $('stamp'); if (stp.textContent !== stamp) { stp.textContent = stamp; stp.classList.remove('bad'); void stp.offsetWidth; if (s.scrolling) stp.classList.add('bad'); }
+    stp.style.setProperty('--stampc', stampc);
+    $('capName').textContent = NAME || 'on-duty'; $('capTime').textContent = new Date().toLocaleTimeString(loc(), {hour:'2-digit', minute:'2-digit'});
+    document.querySelectorAll('#pips i').forEach((p, i) => p.classList.toggle('on', i < lvl));
+    $('lvname').textContent = lvl ? `${L.lvl_of(lvl)} · ${L.lvl[lvl - 1]}` : '';
+    // clock
+    if (s.scrolling) {
+      const want = now - s.phone_min * 60000; if (!phoneStart || Math.abs(phoneStart - want) > 8000) phoneStart = want;
+      $('clockLbl').textContent = L.clock_phone; $('clock').textContent = clockFmt(now - phoneStart);
+      document.title = `📵 ${clockFmt(now - phoneStart)} · on-duty`;
+    } else {
+      phoneStart = 0; document.title = 'on-duty';
+      if (lastBackT) { $('clockLbl').textContent = L.clock_free; $('clock').textContent = clockFmt(now - lastBackT * 1000); $('k-streak').textContent = clockFmt(now - lastBackT * 1000); }
+      else { $('clockLbl').textContent = ''; $('clock').textContent = ''; }
+    }
+    if (lvl >= 4 && Math.random() < .4) rain(lvl >= 5 ? '📵' : '📱');
+    // signals
+    $('dp').textContent = s.dpitch == null ? '–' : fmt(s.dpitch) + '°'; $('dpt').textContent = L.alert_above(c.pitch_delta);
+    const gd = s.gaze == null ? null : s.gaze - s.gaze_base;
+    $('gz').textContent = fmt(gd, 2); $('gzt').textContent = L.gaze_above(c.gaze_delta);
+    $('ph').textContent = !s.phone_on ? L.off : s.phone ? L.visible : L.no; $('ph').style.color = css(s.phone ? '--bad' : '--fg');
+    $('pht').textContent = s.phone_on ? L.seen_in(Math.round(s.phone_ratio * 100)) : '';
+    $('dr').textContent = Math.round(s.down_ratio * 100) + '%';
+    $('drb').style.width = Math.min(100, s.down_ratio / c.down_ratio * 100) + '%'; $('drb').style.background = css(s.down_ratio >= c.down_ratio ? '--bad' : '--acc');
+    $('idle').textContent = s.idle + ' s';
+    $('idleb').style.width = Math.min(100, s.idle / c.idle * 100) + '%'; $('idleb').style.background = css(s.idle >= c.idle ? '--bad' : '--acc');
+    $('calib').textContent = L.calib(s.work_samples, c);
+    $('ev').innerHTML = s.events.length ? s.events.map(e => `<li>${e}</li>`).join('') : `<li class="hint">${L.none_yet}</li>`;
+    if ($('sig').open) draw(s.series.slice(-240), c.pitch_delta);
+    $('cam').src = '/frame.jpg?' + now;
+  } catch { $('pill').textContent = L.offline_pill; $('pill').style.background = css('--mute'); }
+}
+
 function draw(series, thr) {
   const c = $('chart'), dpr = devicePixelRatio || 1, W = c.clientWidth, H = c.clientHeight;
-  c.width = W * dpr; c.height = H * dpr;
+  if (!W) return; c.width = W * dpr; c.height = H * dpr;
   const g = c.getContext('2d'); g.scale(dpr, dpr);
   if (!series.length) return;
   const lo = -25, hi = 35, y = v => H - (Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo) * H;
@@ -149,44 +409,7 @@ function draw(series, thr) {
     g.stroke();
   }
 }
-
-async function tick() {
-  try {
-    const s = await (await fetch('/status')).json();
-    const c = s.cfg || {};
-    setLang(s.lang);
-    $('blur').textContent = s.blur ? L.unblur : L.blur;
-    const state = !s.calibrated ? [L.calibrating, '--warn', L.calibrating_msg]
-      : s.scrolling ? [L.on_phone, '--bad', L.on_phone_msg(s.phone_min, s.level, s.nags)]
-      : s.phone ? [L.phone_seen, '--warn', L.phone_seen_msg]
-      : s.down ? [L.looking_down, '--warn', L.looking_down_msg]
-      : !s.face ? [L.no_face, '--mute', L.no_face_msg]
-      : [L.working, '--ok', L.working_msg];
-    $('pill').textContent = state[0]; $('pill').style.background = css(state[1]);
-    $('headline').textContent = state[2]; $('headline').style.color = css(state[1]);
-    $('dp').textContent = s.dpitch == null ? '–' : fmt(s.dpitch) + '°';
-    $('dpt').textContent = L.alert_above(c.pitch_delta);
-    const gd = s.gaze == null ? null : s.gaze - s.gaze_base;
-    $('gz').textContent = fmt(gd, 2); $('gzt').textContent = L.gaze_above(c.gaze_delta);
-    $('ph').textContent = !s.phone_on ? L.off : s.phone ? L.visible : L.no;
-    $('ph').style.color = css(s.phone ? '--bad' : '--fg');
-    $('pht').textContent = s.phone_on ? L.seen_in(Math.round(s.phone_ratio * 100)) : '';
-    $('dr').textContent = Math.round(s.down_ratio * 100) + '%';
-    $('drb').style.width = Math.min(100, s.down_ratio / c.down_ratio * 100) + '%';
-    $('drb').style.background = css(s.down_ratio >= c.down_ratio ? '--bad' : '--acc');
-    $('idle').textContent = s.idle + ' s';
-    $('idleb').style.width = Math.min(100, s.idle / c.idle * 100) + '%';
-    $('idleb').style.background = css(s.idle >= c.idle ? '--bad' : '--acc');
-    $('calib').textContent = L.calib(s.work_samples, c);
-    $('ev').innerHTML = s.events.length ? s.events.map(e => `<li>${e}</li>`).join('') : `<li class="hint">${L.none_yet}</li>`;
-    $('age').textContent = L.updated(Math.max(0, Math.round(Date.now() / 1000 - s.t)));
-    draw(s.series.slice(-240), c.pitch_delta);
-    $('cam').src = '/frame.jpg?' + Date.now();
-  } catch { $('headline').textContent = L.offline; $('pill').textContent = L.offline_pill; }
-}
-const mins = m => m < 1 ? Math.round(m * 60) + ' ' + L.sec : m < 60 ? m.toFixed(1).replace('.0', '') + ' ' + L.min : (m / 60).toFixed(1) + ' ' + L.h;
-const dayKey = d => d.toLocaleDateString('sv');  // YYYY-MM-DD local
-
+const dayKey = d => d.toLocaleDateString('sv');
 function bars(id, labels, vals, hl) {
   const c = $(id), dpr = devicePixelRatio || 1, W = c.clientWidth, H = c.clientHeight;
   c.width = W * dpr; c.height = H * dpr;
@@ -196,41 +419,103 @@ function bars(id, labels, vals, hl) {
   vals.forEach((v, i) => {
     const h = v / max * (H - top - bot);
     g.fillStyle = css(i === hl ? '--bad' : '--acc'); g.globalAlpha = v ? 1 : .2;
-    g.fillRect(i * bw + 2, H - bot - Math.max(h, 1), bw - 4, Math.max(h, 1));
+    g.beginPath(); g.roundRect(i * bw + 2, H - bot - Math.max(h, 2), bw - 4, Math.max(h, 2), 3); g.fill();
     g.globalAlpha = 1; g.fillStyle = css('--mute');
     if (v) g.fillText(v < 1 ? Math.round(v * 60) + 's' : Math.round(v), i * bw + bw / 2, H - bot - h - 3);
     if (labels[i]) g.fillText(labels[i], i * bw + bw / 2, H - 3);
   });
 }
-
 async function history() {
   const txt = await (await fetch('/history')).text();
   const ev = txt.split('\n').filter(Boolean).map(l => JSON.parse(l));
   const sess = ev.filter(e => e.kind === 'back'), alerts = ev.filter(e => e.kind === 'alert');
+  lastBackT = sess.length ? Math.max(...sess.map(e => e.t)) : 0;
   const now = new Date(), today = dayKey(now), weekAgo = now / 1000 - 7 * 86400;
-  const todayS = sess.filter(e => dayKey(new Date(e.start * 1000)) === today);
-  const sum = a => a.reduce((x, e) => x + e.minutes, 0);
-  $('k-min').textContent = mins(sum(todayS));
-  $('k-n').textContent = todayS.length;
+  const todayS = sess.filter(e => dayKey(new Date(e.start * 1000)) === today), sum = a => a.reduce((x, e) => x + e.minutes, 0);
+  $('k-min').textContent = mins(sum(todayS)); $('k-n').textContent = todayS.length;
   const alT = alerts.filter(e => dayKey(new Date(e.t * 1000)) === today);
-  $('k-al').innerHTML = alT.length + (alT.length ? ` <span class="hint">${L.via_phone(alT.filter(e => (e.cause || '').includes('phone') || (e.cause || '').includes('celular')).length)}</span>` : '');
+  $('k-al').textContent = alT.length;
   $('k-max').textContent = todayS.length ? mins(Math.max(...todayS.map(e => e.minutes))) : '–';
-  const wk = sum(sess.filter(e => e.start >= weekAgo));
-  $('k-wk').textContent = mins(wk); $('k-avg').textContent = mins(wk / 7);
-  $('hsub').textContent = L.sessions(sess.length);
+  $('k-wk').textContent = mins(sum(sess.filter(e => e.start >= weekAgo)));
   const hours = Array(24).fill(0); todayS.forEach(e => hours[new Date(e.start * 1000).getHours()] += e.minutes);
   bars('byhour', hours.map((_, h) => h % 3 ? '' : h + L.h), hours, now.getHours());
   const days = [...Array(14)].map((_, i) => { const d = new Date(now); d.setDate(d.getDate() - 13 + i); return d; });
-  bars('byday', days.map((d, i) => i % 2 ? '' : d.getDate() + '/' + (d.getMonth() + 1)),
-       days.map(d => sum(sess.filter(e => dayKey(new Date(e.start * 1000)) === dayKey(d)))), 13);
-  $('sess').innerHTML = sess.slice(-12).reverse().map(e => {
-    const d = new Date(e.start * 1000);
-    return `<li>${d.toLocaleDateString(LANG.replace('_', '-'), {day:'2-digit', month:'2-digit'})} ${d.toLocaleTimeString(LANG.replace('_', '-'), {hour:'2-digit', minute:'2-digit'})} · ${L.on_phone_row(mins(e.minutes), e.alerts)}</li>`;
-  }).join('') || `<li class="hint">${L.no_sessions}</li>`;
+  bars('byday', days.map((d, i) => i % 2 ? '' : d.getDate() + '/' + (d.getMonth() + 1)), days.map(d => sum(sess.filter(e => dayKey(new Date(e.start * 1000)) === dayKey(d)))), 13);
+  const top = alT.filter(e => e.said).sort((a, b) => b.level - a.level || b.t - a.t).slice(0, 5);
+  $('shame').innerHTML = top.length ? top.map((e, i) => `<button data-i2="${i}"><span class="lv" style="background:${PAL[e.level][1]}">${e.level}/5</span><span class="tx">${e.said.replace(/</g, '&lt;')}</span><span class="sh">📸</span></button>`).join('') : `<div class="hint">${L.no_shame}</div>`;
+  document.querySelectorAll('#shame button').forEach(b => b.onclick = () => { const e = top[+b.dataset.i2]; openCard({img:null, text:e.said, level:e.level, kind:'nag', minutes:0, t:e.t}); });
 }
 
-tick(); setInterval(tick, 700);
-history(); setInterval(history, 10000);
+/* ---------- share card (1080×1350, Instagram 4:5) ---------- */
+function wrap(g, text, maxW) {
+  const out = []; let line = '';
+  for (const w of text.split(' ')) { const t = line ? line + ' ' + w : w; if (g.measureText(t).width > maxW && line) { out.push(line); line = w; } else line = t; }
+  return line ? [...out, line] : out;
+}
+const loadImg = src => new Promise(r => { const i = new Image(); i.onload = () => r(i); i.onerror = () => r(null); i.src = src; });
+async function drawCard(m) {
+  const W = 1080, H = 1350, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+  const pal = PAL[m.level] || PAL[0], back = m.kind === 'back';
+  const bg = g.createLinearGradient(0, 0, W, H); bg.addColorStop(0, pal[0]); bg.addColorStop(1, pal[1]); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+  g.save(); g.globalAlpha = .12; g.strokeStyle = '#fff'; g.lineWidth = 2;
+  for (let i = -H; i < W; i += 26) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i + H, H); g.stroke(); } g.restore();
+  const rg = g.createRadialGradient(W * .75, 150, 20, W * .75, 150, 700); rg.addColorStop(0, '#ffffff55'); rg.addColorStop(1, '#fff0'); g.fillStyle = rg; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#fff'; g.textBaseline = 'alphabetic'; g.font = '900 60px "Avenir Next",system-ui,sans-serif';
+  g.fillText(back ? L.card_back : L.card_caught, 64, 112);
+  const lv = m.level ? L.lvl_of(m.level) + ' · ' + L.lvl[m.level - 1] : '';
+  if (lv) { g.font = '800 30px "Avenir Next",system-ui'; const w = g.measureText(lv.toUpperCase()).width + 44; g.fillStyle = '#0006'; g.beginPath(); g.roundRect(W - 64 - w, 64, w, 56, 28); g.fill();
+    g.fillStyle = '#fff'; g.fillText(lv.toUpperCase(), W - 64 - w + 22, 102); }
+  // polaroid
+  g.save(); g.translate(W / 2, 510); g.rotate(-.04); g.scale(.9, .9);
+  g.shadowColor = '#0007'; g.shadowBlur = 50; g.shadowOffsetY = 26; g.fillStyle = '#fff'; g.fillRect(-350, -400, 700, 800); g.shadowColor = 'transparent';
+  const ix = -318, iy = -368, iw = 636, ih = 560; g.fillStyle = '#111'; g.fillRect(ix, iy, iw, ih);
+  g.save(); g.beginPath(); g.rect(ix, iy, iw, ih); g.clip();
+  if (m.img) { const r = Math.max(iw / m.img.width, ih / m.img.height), w = m.img.width * r, h = m.img.height * r; g.drawImage(m.img, ix + (iw - w) / 2, iy + (ih - h) / 2, w, h); }
+  else { const lg = await loadImg('/logo.svg'); const ig = g.createLinearGradient(0, iy, 0, iy + ih); ig.addColorStop(0, '#1e1b4b'); ig.addColorStop(1, '#0f172a'); g.fillStyle = ig; g.fillRect(ix, iy, iw, ih);
+    if (lg) g.drawImage(lg, ix + iw / 2 - 200, iy + ih / 2 - 200, 400, 400); }
+  g.restore();
+  g.fillStyle = '#222'; g.font = '700 46px "Marker Felt","Bradley Hand",cursive'; g.fillText(NAME || 'on-duty', ix, 262);
+  g.globalAlpha = .55; g.font = '700 34px "Marker Felt","Bradley Hand",cursive'; g.textAlign = 'right';
+  g.fillText(new Date((m.t || Date.now() / 1000) * 1000).toLocaleTimeString(loc(), {hour:'2-digit', minute:'2-digit'}), ix + iw, 262); g.textAlign = 'left'; g.globalAlpha = 1;
+  g.fillStyle = '#444'; g.font = '700 30px "Avenir Next",system-ui'; if (m.minutes) g.fillText(back ? L.back_meta(mins(m.minutes)) : L.card_on(mins(m.minutes)), ix, 330);
+  // stamp
+  g.save(); g.translate(250, -310); g.rotate(.2); const sc = back ? '#16a34a' : '#dc2626', st = back ? L.card_stamp_back : L.card_stamp;
+  g.font = '900 54px "Avenir Next",system-ui'; const sw = g.measureText(st).width + 48;
+  g.fillStyle = '#fffe'; g.beginPath(); g.roundRect(-sw / 2, -44, sw, 84, 12); g.fill(); g.lineWidth = 8; g.strokeStyle = sc; g.stroke();
+  g.fillStyle = sc; g.textAlign = 'center'; g.fillText(st, 0, 20); g.restore();
+  g.restore();
+  // bubble
+  let size = 58, lines;
+  for (; size >= 30; size -= 4) { g.font = `800 ${size}px "Avenir Next",system-ui`; lines = wrap(g, m.text, 860); if (lines.length <= (size >= 38 ? 3 : 4)) break; }
+  size = Math.max(size, 30); g.font = `800 ${size}px "Avenir Next",system-ui`; lines = wrap(g, m.text, 860);
+  const lh = size * 1.18, bh = lines.length * lh + 64, by = 930;
+  g.shadowColor = '#0006'; g.shadowBlur = 36; g.shadowOffsetY = 14; g.fillStyle = '#fff'; g.beginPath(); g.roundRect(80, by, 920, bh, 40); g.fill();
+  g.beginPath(); g.moveTo(220, by + 2); g.lineTo(250, by - 38); g.lineTo(290, by + 2); g.fill(); g.shadowColor = 'transparent';
+  g.fillStyle = '#17171a'; g.textAlign = 'left'; lines.forEach((l, i) => g.fillText(l, 120, by + 32 + size * .95 + i * lh));
+  // footer
+  const lg = await loadImg('/logo.svg'); if (lg) g.drawImage(lg, 64, H - 100, 52, 52);
+  g.fillStyle = '#fff'; g.font = '800 30px "Avenir Next",system-ui'; g.globalAlpha = .95; g.fillText(L.card_foot, 132, H - 63); g.globalAlpha = 1;
+  return c;
+}
+let cardBlob = null;
+async function openCard(m) {
+  const c = await drawCard(m); cardBlob = await new Promise(r => c.toBlob(r, 'image/png'));
+  $('shot').src = URL.createObjectURL(cardBlob); $('modal').classList.add('on'); $('photo').classList.remove('hot');
+}
+$('photo').onclick = async () => {
+  if (!moment) { const img = await grabFrame(); moment = {img, text:$('line').textContent || L.idle_work(NAME), level:Math.max(0, cur.lvl), kind:'nag', minutes:0, t:Date.now() / 1000}; }
+  openCard(moment);
+};
+$('close').onclick = () => $('modal').classList.remove('on');
+$('modal').onclick = e => { if (e.target.id === 'modal') $('modal').classList.remove('on'); };
+addEventListener('keydown', e => { if (e.key === 'Escape') $('modal').classList.remove('on'); });
+$('dl').onclick = () => { const a = document.createElement('a'); a.href = $('shot').src; a.download = `on-duty-${Date.now()}.png`; a.click(); toast(L.toast_saved); };
+$('cp').onclick = async () => { try { await navigator.clipboard.write([new ClipboardItem({'image/png': cardBlob})]); toast(L.toast_copied); } catch { toast(L.toast_nocopy); } };
+$('sh').onclick = async () => { const f = new File([cardBlob], 'on-duty.png', {type:'image/png'});
+  if (navigator.canShare && navigator.canShare({files:[f]})) navigator.share({files:[f]}).catch(() => {}); else $('dl').click(); };
+
+setLang('pt_BR'); $('line').textContent = L.connecting;
+face('work'); tick(); setInterval(tick, 700); history(); setInterval(history, 10000);
 </script>
 </body>
 </html>

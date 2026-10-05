@@ -51,10 +51,10 @@ def record(kind: str, **kw) -> None:
 def history_ndjson() -> bytes:
     """Mesmo formato que o painel já consome (alerts = n na volta)."""
     with _lock:
-        rows = con().execute("SELECT t, kind, start, minutes, n, level, cause FROM events ORDER BY t").fetchall()
+        rows = con().execute("SELECT t, kind, start, minutes, n, level, cause, said FROM events ORDER BY t").fetchall()
     out = []
-    for t, kind, start, minutes, n, level, cause in rows:
-        e = {"t": t, "kind": kind, "start": start, "minutes": minutes, "level": level, "cause": cause}
+    for t, kind, start, minutes, n, level, cause, said in rows:
+        e = {"t": t, "kind": kind, "start": start, "minutes": minutes, "level": level, "cause": cause, "said": said}
         e["alerts" if kind == "back" else "n"] = n
         out.append(json.dumps({k: v for k, v in e.items() if v is not None}))
     return "\n".join(out).encode()

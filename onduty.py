@@ -190,6 +190,17 @@ TEMPLATE = {
 
 
 def cmd_phrases(a) -> None:
+    if a.action == "sources":
+        home = Path.home()
+        globs = [".claude/CLAUDE.md", ".claude/projects/*/memory/*.md", ".cursor/rules/*", ".cursorrules",
+                 ".codex/AGENTS.md", ".codex/memories/*", ".gemini/GEMINI.md", ".codeium/windsurf/memories/*",
+                 ".github/copilot-instructions.md", ".aider.conf.yml", ".continue/rules/*", ".clinerules/*",
+                 "AGENTS.md", "CLAUDE.md"]
+        found = [f for g in globs for f in sorted(home.glob(g)) if f.is_file()]
+        for f in found:
+            print(f"{f.stat().st_size:>8}  {f}")
+        print(f"{len(found)} candidate files (nothing was read). Ask the user before opening any.", file=sys.stderr)
+        return
     if a.action == "template":
         print(json.dumps(TEMPLATE, indent=2, ensure_ascii=False))
         return
@@ -222,8 +233,8 @@ def main() -> None:
     s = sub.add_parser("setup", help="set name / language / voice (interactive without flags)")
     s.add_argument("--name"), s.add_argument("--lang", choices=list(config.VOICES)), s.add_argument("--voice")
     s.set_defaults(fn=cmd_setup)
-    ph = sub.add_parser("phrases", help="phrases template | validate  (custom pack: ~/.on-duty/phrases.json)")
-    ph.add_argument("action", choices=["template", "validate"])
+    ph = sub.add_parser("phrases", help="phrases template | validate | sources  (custom pack: ~/.on-duty/phrases.json)")
+    ph.add_argument("action", choices=["template", "validate", "sources"])
     ph.set_defaults(fn=cmd_phrases)
     a = p.parse_args()
     a.fn(a)

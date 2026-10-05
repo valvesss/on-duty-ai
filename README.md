@@ -21,8 +21,16 @@ to your desk. Everything runs locally on your Mac: no cloud, no LLM at runtime, 
 Then it speaks, escalating every 3 lines through 5 levels (gentle → sarcastic → firm → drama → chaos),
 until you touch the keyboard again.
 
-Dashboard at <http://localhost:7878>: live camera (with a blur button), signals, history. Your data
-(events + calibration) lives in `~/.on-duty/on-duty.db`.
+Dashboard at <http://localhost:7878> — keep it open and it becomes a show:
+
+- **Live stage:** a mascot whose face (and the whole page's mood) escalates with the nag level, and the
+  line being spoken **types out live** in a speech bubble.
+- **"Caught red-handed" polaroid** with your camera frame, a stamp and a running clock.
+- **📸 Snap:** turns any moment (or any line from the *Hall of shame*) into a 4:5 card for stories/chats —
+  download, copy or share. Level 4–5 lines pulse the button: those are the ones worth posting.
+- Blur button for the camera preview, history charts, and a collapsible panel with the raw signals.
+
+Your data (events + calibration) lives in `~/.on-duty/on-duty.db`.
 
 ## Install
 
@@ -42,7 +50,7 @@ Allow **Camera** for OnDuty when macOS asks.
 ```
 ./onduty install | uninstall | start | stop | restart | status | logs | stats | db | doctor
 ./onduty setup [--name N] [--lang en_US] [--voice Samantha]
-./onduty phrases template | validate
+./onduty phrases template | validate | sources
 ```
 
 Settings live in `~/.on-duty/config.json` (name, language, voice, port, camera, thresholds).
@@ -50,8 +58,11 @@ Settings live in `~/.on-duty/config.json` (name, language, voice, port, camera, 
 ### Personalized phrases (optional)
 
 Ask your AI assistant to personalize the lines — in Claude Code, open this repo and say
-"personalize on-duty's phrases"; the `on-duty-phrases` skill (`.claude/skills/`) writes
-`~/.on-duty/phrases.json` for you. Any assistant works: `./onduty phrases template` prints the schema and
+"personalize on-duty's phrases". The `on-duty-phrases` skill (`.claude/skills/`) lists the memory/rules
+files other assistants left on your Mac (Claude Code, Cursor, Codex, Gemini, Windsurf, Copilot…) with
+`./onduty phrases sources`, **asks before reading any of them**, mines them for things to joke about
+(your stack, projects, running gags — never secrets or anything private), and writes
+`~/.on-duty/phrases.json`. Any assistant works: `./onduty phrases template` prints the schema and
 `./onduty phrases validate` checks the result. Built-in lines are mixed in
 (`"custom_phrases_only": true` to use only yours). No API key, no network.
 

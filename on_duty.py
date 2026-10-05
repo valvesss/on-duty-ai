@@ -39,7 +39,7 @@ FACE_MODEL = HERE / "models" / "face_landmarker.task"
 YOLO_MODEL = HERE / "models" / "yolo11n.pt"
 
 STATE: dict = {"status": {}, "jpeg": b"", "events": collections.deque(maxlen=30),
-               "series": collections.deque(maxlen=240), "test": False, "blur": False}
+               "series": collections.deque(maxlen=240), "test": False, "blur": False, "said": None, "said_id": 0}
 
 T = {  # the few strings the engine says outside the phrase packs
     "pt_BR": {"level": "Nível {lv} de 5", "sec": "{n} segundos", "min1": "1 minuto", "min": "{n} minutos"},
@@ -144,7 +144,7 @@ class Nagger:
             self.ended, self.proc = time.time(), None
         return False
 
-    def say(self, item, level: int, minutes: float = 0, n: int = 0) -> str:
+    def say(self, item, level: int, minutes: float = 0, n: int = 0, kind: str = "nag") -> str:
         parts = [item] if isinstance(item, str) else item
         fmt = {"time": self.tempo(minutes), "n": n, "name": self.cfg["name"]}
         lines = [x.format(**fmt) for x in parts]
@@ -153,7 +153,11 @@ class Nagger:
                 self.proc.kill()
             self.proc = subprocess.Popen(["say", "-v", self.voice, "-r", str(self.RATE[level]),
                                           " [[slnc 600]] ".join(lines)])
-        return " ".join(lines)
+        text = " ".join(lines)
+        STATE["said_id"] += 1  # the dashboard types this out live
+        STATE["said"] = {"id": STATE["said_id"], "text": text, "level": level + 1, "kind": kind,
+                         "t": int(time.time()), "minutes": round(minutes, 1), "n": n}
+        return text
 
     def level(self, n: int) -> int:
         return min(4, max(0, n - 1) // self.NAGS_PER_LEVEL)
@@ -173,7 +177,7 @@ class Nagger:
 
     def welcome(self, minutes: float) -> str:
         tier = "quick" if minutes < 1 else "medium" if minutes < 5 else "long"
-        return self.say(self._pick(tier, self.back[tier]), 0, minutes)
+        return self.say(self._pick(tier, self.back[tier]), 0, minutes, kind="back")
 
 
 def head_pose(lm: vision.FaceLandmarker, frame) -> tuple[float, float] | None:
@@ -301,7 +305,7 @@ def main() -> None:
             if STATE["test"]:
                 STATE["test"] = False
                 lv = random.randrange(5)
-                log(f"📵 test (level {lv + 1}): {nag.say(random.choice(nag.levels[lv]), lv, 3, 7)}")
+                log(f"📵 test (level {lv + 1}): {nag.say(random.choice(nag.levels[lv]), lv, 3, 7, kind="test")}")
             if now - last_save >= 60 and work_pitch:  # persist posture so restarts don't recalibrate
                 last_save = now
                 db.put("calibration", {"pitch": list(work_pitch)[-300:], "gaze": list(work_gaze)[-300:]})
@@ -319,7 +323,7 @@ def main() -> None:
                 "idle": round(idle), "scrolling": bool(streak_start), "level": nag.level(n_nags) + 1 if n_nags else 0,
                 "nags": n_nags, "calibrated": base is not None, "work_samples": len(work_pitch),
                 "phone_min": round((now - streak_start) / 60, 1) if streak_start else 0, "cfg": th,
-                "blur": STATE["blur"],
+                "blur": STATE["blur"], "said": STATE["said"],
             }
             STATE["series"].append([int(now), dpitch, gaze - gbase if gaze is not None else None, down,
                                     idle >= th["idle"], bool(phone_boxes)])
