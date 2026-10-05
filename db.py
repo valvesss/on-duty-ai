@@ -43,6 +43,14 @@ MIGRATIONS = [
     """,
     # 2: the dashboard's "time on phone today" and streaks read back rows by start time
     "CREATE INDEX IF NOT EXISTS events_kind_start ON events(kind, start);",
+    # 3: timed focus blocks (the weekly summary and the dashboard read these)
+    """
+    CREATE TABLE IF NOT EXISTS focus (
+      id INTEGER PRIMARY KEY, start INTEGER NOT NULL, planned REAL NOT NULL, ended INTEGER NOT NULL, actual REAL NOT NULL,
+      completed INTEGER NOT NULL, slips INTEGER NOT NULL, phone_min REAL NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS focus_start ON focus(start);
+    """,
 ]
 
 
@@ -129,3 +137,23 @@ def clear_events() -> int:
 def count_events() -> int:
     with _lock:
         return con().execute("SELECT count(*) FROM events").fetchone()[0]
+
+
+def record_focus(f: dict) -> None:
+    with _lock:
+        con().execute("INSERT INTO focus (start, planned, ended, actual, completed, slips, phone_min) VALUES (?,?,?,?,?,?,?)",
+                      (f["start"], f["planned"], f["ended"], f["actual"], int(f["completed"]), f["slips"], f["phone_min"]))
+
+
+def focus_rows(since: int) -> list[dict]:
+    with _lock:
+        rows = con().execute("SELECT start, planned, ended, actual, completed, slips, phone_min FROM focus WHERE start >= ? ORDER BY start", (since,)).fetchall()
+    keys = ("start", "planned", "ended", "actual", "completed", "slips", "phone_min")
+    return [{**dict(zip(keys, r)), "completed": bool(r[4])} for r in rows]
+
+
+def events_since(since: int) -> list[dict]:
+    with _lock:
+        rows = con().execute("SELECT t, kind, start, minutes, n, level, cause FROM events WHERE t >= ? ORDER BY t", (since,)).fetchall()
+    keys = ("t", "kind", "start", "minutes", "n", "level", "cause")
+    return [dict(zip(keys, r)) for r in rows]

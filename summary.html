@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>on-duty · week</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<style>
+  :root { --bg:#f4f3ef; --card:#fff; --fg:#1b1b1a; --mute:#77756f; --line:#e4e2dc; --ok:#16a34a; --bad:#dc2626; --acc:#2563eb; --c1:#0f766e; --c2:#2563eb; --font:"Avenir Next","SF Pro Rounded",ui-rounded,system-ui,sans-serif; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0e0e0d; --card:#1a1a18; --fg:#ecebe6; --mute:#9a988f; --line:#2c2b28; } }
+  * { box-sizing:border-box } body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.45 var(--font) }
+  main { max-width:980px; margin:0 auto; padding:18px 18px 70px; display:grid; gap:16px }
+  header { display:flex; align-items:center; gap:12px } header img { width:32px; height:32px } header h1 { margin:0; font-size:19px; letter-spacing:-.02em } .sp { flex:1 }
+  .btn { font:inherit; font-weight:700; border:1px solid var(--line); background:var(--card); color:var(--fg); border-radius:99px; padding:8px 16px; cursor:pointer; text-decoration:none }
+  .seg { display:inline-flex; background:var(--card); border:1px solid var(--line); border-radius:99px; padding:3px } .seg button { font:inherit; font-weight:700; border:0; background:transparent; color:var(--mute); border-radius:99px; padding:6px 14px; cursor:pointer } .seg button.on { background:var(--fg); color:var(--bg) }
+  .hero { color:#fff; border-radius:26px; padding:28px; background:linear-gradient(135deg,var(--c1),var(--c2)); position:relative; overflow:hidden; box-shadow:0 20px 50px -22px var(--c2) }
+  .hero::before { content:""; position:absolute; inset:-50%; opacity:.12; background:repeating-linear-gradient(45deg,#fff 0 2px,transparent 2px 22px) }
+  .hero > * { position:relative } .hero small { font-weight:800; text-transform:uppercase; letter-spacing:.08em; opacity:.85 }
+  .hero h2 { margin:6px 0 4px; font-size:clamp(34px,6vw,60px); letter-spacing:-.04em; line-height:1 } .hero p { margin:0; font-size:18px; opacity:.95 }
+  .trend { display:inline-block; margin-top:12px; background:#0003; border-radius:99px; padding:5px 14px; font-weight:800 }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:20px; padding:18px } .card h3 { margin:0 0 12px; font-size:16px }
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px } .kpis div { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:12px 14px } .kpis b { display:block; font-size:25px; letter-spacing:-.02em } .kpis span { color:var(--mute); font-size:12px }
+  .bars { display:flex; align-items:flex-end; gap:10px; height:180px } .bar { flex:1; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; gap:6px; height:100% } .bar i { width:100%; border-radius:10px 10px 4px 4px; background:linear-gradient(180deg,var(--c2),var(--c1)); min-height:3px; transition:height .6s } .bar.worst i { background:linear-gradient(180deg,#ef4444,#be123c) } .bar.best i { background:linear-gradient(180deg,#22c55e,#15803d) }
+  .bar b { font-size:12px } .bar span { font-size:12px; color:var(--mute) }
+  .heat { display:grid; grid-template-columns:44px repeat(24,1fr); gap:3px; align-items:center } .heat .lb { font-size:11px; color:var(--mute) } .heat .c { aspect-ratio:1; border-radius:4px; background:var(--line) } .heat .h { font-size:10px; color:var(--mute); text-align:center }
+  .row { display:flex; gap:10px; flex-wrap:wrap } .chip { background:var(--bg); border:1px solid var(--line); border-radius:99px; padding:6px 14px; font-weight:700 } .hint { color:var(--mute); font-size:13px }
+  #toast { position:fixed; bottom:22px; left:50%; transform:translate(-50%,80px); background:#111; color:#fff; padding:10px 18px; border-radius:99px; font-weight:700; transition:.35s } #toast.on { transform:translate(-50%,0) }
+</style>
+</head>
+<body>
+<main>
+  <header><img src="/logo.svg" alt=""><h1 id="ttl"></h1><span class="sp"></span><div class="seg" id="rng"><button data-d="7" class="on">7</button><button data-d="14">14</button><button data-d="30">30</button></div><a class="btn" href="/" id="back"></a></header>
+  <section class="hero"><small id="hk"></small><h2 id="hbig"></h2><p id="hsub"></p><span class="trend" id="trend"></span></section>
+  <section class="kpis" id="kpis"></section>
+  <section class="card"><h3 id="t-days"></h3><div class="bars" id="bars"></div></section>
+  <section class="card"><h3 id="t-heat"></h3><div class="heat" id="heat"></div><p class="hint" id="heathint"></p></section>
+  <section class="card"><h3 id="t-focus"></h3><div class="row" id="focus"></div></section>
+  <div class="row"><button class="btn" id="copy"></button></div>
+</main>
+<div id="toast"></div>
+<script>
+const $ = id => document.getElementById(id);
+const S = {
+  en: {ttl:'Your week', back:'← Dashboard', hk:'Time on your phone', min:m => m >= 60 ? (m / 60).toFixed(1) + ' h' : Math.round(m) + ' min', none:'Nothing recorded yet', hsub:(s, sc) => `${s} sessions · ${sc} scoldings`,
+    trend:(p, prev) => p === null ? 'first week of data' : p < 0 ? `▼ ${-p}% vs. the previous period (${prev})` : p > 0 ? `▲ ${p}% vs. the previous period (${prev})` : 'same as the previous period',
+    k:['Sessions','Scoldings','Longest session','Best day','Worst day','Worst hour'], t_days:'Minutes on the phone, per day', t_heat:'When it happens (hour of day)', heathint:'Each cell is the time on the phone for sessions that started in that hour.',
+    t_focus:'Focus blocks', f_none:'No focus blocks yet. Start one from the dashboard (🎯 Focus).', f:(f) => [`${f.blocks} blocks`, `${f.completed} completed`, `${Math.round(f.minutes)} min focused`, `${f.slips} slips`],
+    copy:'Copy as text', copied:'Copied!', dow:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'], txt:(r, T) => `on-duty · my last ${r.days.length} days\nOn the phone: ${T.min(r.total_min)} (${r.sessions} sessions, ${r.scoldings} scoldings)\nLongest session: ${T.min(r.longest_session_min)}\nFocus blocks: ${r.focus.completed}/${r.focus.blocks} completed`},
+  pt: {ttl:'Sua semana', back:'← Painel', hk:'Tempo no celular', min:m => m >= 60 ? (m / 60).toFixed(1) + ' h' : Math.round(m) + ' min', none:'Nada registrado ainda', hsub:(s, sc) => `${s} sessões · ${sc} broncas`,
+    trend:(p, prev) => p === null ? 'primeira semana de dados' : p < 0 ? `▼ ${-p}% em relação ao período anterior (${prev})` : p > 0 ? `▲ ${p}% em relação ao período anterior (${prev})` : 'igual ao período anterior',
+    k:['Sessões','Broncas','Maior sessão','Melhor dia','Pior dia','Pior horário'], t_days:'Minutos no celular, por dia', t_heat:'Quando acontece (hora do dia)', heathint:'Cada célula é o tempo no celular das sessões que começaram naquela hora.',
+    t_focus:'Blocos de foco', f_none:'Nenhum bloco de foco ainda. Comece um no painel (🎯 Foco).', f:(f) => [`${f.blocks} blocos`, `${f.completed} concluídos`, `${Math.round(f.minutes)} min focados`, `${f.slips} escapadas`],
+    copy:'Copiar como texto', copied:'Copiado!', dow:['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'], txt:(r, T) => `on-duty · meus últimos ${r.days.length} dias\nNo celular: ${T.min(r.total_min)} (${r.sessions} sessões, ${r.scoldings} broncas)\nMaior sessão: ${T.min(r.longest_session_min)}\nBlocos de foco: ${r.focus.completed}/${r.focus.blocks} concluídos`},
+};
+let T = S.en, days = 7, last = null;
+const loc = () => document.documentElement.lang;
+async function load() {
+  const [r, cfg] = await Promise.all([fetch('/api/summary?days=' + days).then(x => x.json()), fetch('/api/config').then(x => x.json())]);
+  const pt = cfg.config.lang === 'pt_BR'; T = pt ? S.pt : S.en; document.documentElement.lang = pt ? 'pt-BR' : 'en'; last = r;
+  $('ttl').textContent = T.ttl; $('back').textContent = T.back; document.title = 'on-duty · ' + T.ttl.toLowerCase(); $('hk').textContent = T.hk; $('t-days').textContent = T.t_days; $('t-heat').textContent = T.t_heat; $('heathint').textContent = T.heathint; $('t-focus').textContent = T.t_focus; $('copy').textContent = T.copy;
+  $('hbig').textContent = r.sessions || r.total_min ? T.min(r.total_min) : T.none; $('hsub').textContent = T.hsub(r.sessions, r.scoldings); $('trend').textContent = T.trend(r.trend_pct, T.min(r.prev_total_min));
+  const dn = d => d ? T.dow[new Date(d + 'T12:00').getDay() === 0 ? 6 : new Date(d + 'T12:00').getDay() - 1] : '–', wh = r.worst_hours[0];
+  const vals = [r.sessions, r.scoldings, T.min(r.longest_session_min), dn(r.best_day), dn(r.worst_day), wh ? wh.hour + 'h' : '–'];
+  $('kpis').innerHTML = T.k.map((k, i) => `<div><b>${vals[i]}</b><span>${k}</span></div>`).join('');
+  const max = Math.max(1, ...r.days.map(d => d.minutes));
+  $('bars').innerHTML = r.days.map(d => `<div class="bar ${d.date === r.worst_day ? 'worst' : d.date === r.best_day ? 'best' : ''}"><b>${d.minutes ? Math.round(d.minutes) : ''}</b><i style="height:${d.minutes / max * 100}%"></i><span>${days <= 14 ? T.dow[d.dow] : d.date.slice(8)}</span></div>`).join('');
+  const hm = Math.max(1, ...r.heat.flat()); let h = '<span></span>' + [...Array(24)].map((_, i) => `<span class="h">${i % 3 ? '' : i}</span>`).join('');
+  r.heat.slice(-7).forEach((row, i) => { const d = r.days[r.days.length - Math.min(7, r.days.length) + i]; h += `<span class="lb">${T.dow[d.dow]}</span>` + row.map(v => `<span class="c" style="${v ? `background:color-mix(in srgb, #ef4444 ${Math.round(18 + v / hm * 82)}%, var(--line))` : ''}" title="${v} min"></span>`).join(''); });
+  $('heat').innerHTML = h;
+  $('focus').innerHTML = r.focus.blocks ? T.f(r.focus).map(x => `<span class="chip">${x}</span>`).join('') : `<span class="hint">${T.f_none}</span>`;
+}
+$('rng').querySelectorAll('button').forEach(b => b.onclick = () => { days = +b.dataset.d; $('rng').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); load(); });
+$('copy').onclick = () => { navigator.clipboard?.writeText(T.txt(last, T)); const t = $('toast'); t.textContent = T.copied; t.classList.add('on'); setTimeout(() => t.classList.remove('on'), 1500); };
+load();
+</script>
+</body>
+</html>

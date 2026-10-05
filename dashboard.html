@@ -24,6 +24,7 @@
   header h1 { margin:0; font-size:20px; letter-spacing:-.02em }
   .pill { font-size:12px; font-weight:700; padding:4px 10px; border-radius:99px; color:#fff; background:var(--mute); text-transform:uppercase; letter-spacing:.04em }
   header .sp { flex:1 }
+  header button, header .calbtn, header .gear { padding:6px 12px; font-size:13px }
   .banner { display:flex; gap:12px; align-items:center; background:#fef3c7; color:#422006; border:1px solid #f59e0b55; border-radius:14px; padding:10px 14px; font-weight:600 }
   .banner a { background:#422006; color:#fef3c7; text-decoration:none; border-radius:99px; padding:6px 14px; font-weight:800; font-size:14px; white-space:nowrap }
   .banner button { margin-left:auto; border:0; background:transparent; font-size:20px; padding:0 4px; color:inherit; box-shadow:none }
@@ -148,8 +149,10 @@
   <header>
     <img src="/logo.svg" alt="" class="logo"><h1>on-duty</h1><span class="pill" id="pill">…</span><span class="sp"></span>
     <a href="/setup?calibrate" class="calbtn" id="calLink"></a>
+    <span class="menuwrap"><button id="focusBtn"></button><div class="menu" id="fmenu"><button data-f="25">25 min</button><button data-f="50">50 min</button><button data-f="90">90 min</button><button id="fstop" data-i="f_stop"></button></div></span>
     <span class="menuwrap"><button id="camBtn" data-i="cam_menu"></button><div class="menu" id="cmenu"><button id="mirror"></button><button id="blur"></button><button id="level"></button><button id="unlevel" data-i="unlevel"></button></div></span><button id="test" data-i="test"></button>
     <span class="menuwrap"><button id="pause"></button><div class="menu" id="pmenu"><button data-m="60" data-i="p1h"></button><button data-m="tomorrow" data-i="ptom"></button></div></span>
+    <a href="/summary" class="gear" id="sumLink" title="Week" aria-label="Week">📊</a>
     <a href="/settings" class="gear" id="gear" title="Settings" aria-label="Settings">⚙</a><button id="photo" data-i="photo"></button>
   </header>
 
@@ -176,7 +179,7 @@
       </svg>
       <div class="bubble" id="bubble"><p id="line"></p><div class="bmeta" id="lmeta"></div></div>
       <div class="hud">
-        <button class="fb" id="fbNo" style="display:none"></button>
+        <button class="fb" id="fbNo" style="display:none"></button><span class="fb" id="focusChip" style="display:none"></span>
         <div class="clock"><span id="clockLbl"></span><b id="clock">0:00</b></div>
         <div><div class="pips" id="pips"><i></i><i></i><i></i><i></i><i></i></div><div class="lvname" id="lvname"></div></div>
       </div>
@@ -238,6 +241,8 @@ const STR = {
     cal_never:'Ainda não calibrei com você. Leva 40 s e acerta bastante.', cal_new:'Setup novo detectado (tela ou câmera diferente). Recalibrar?', cal_drift:'Parece que sua postura, a câmera ou o notebook mudou de lugar. Recalibrar?', cal_go:'📐 Calibrar',
     hl_camera:'Não consigo abrir a câmera (notebook fechado? outro app usando? permissão?).', hl_dark:'Está escuro: não consigo te ver direito.', hl_blocked:'Quase não te vejo enquanto você digita: câmera tapada ou fora de posição?',
     fb_no:'🙅 Não estava no celular', fb_miss:'📱 Você deixou passar', fb_no_t:'Anotado: fico mais relaxado.', fb_miss_t:'Anotado: fico mais rigoroso.', radar_hint:'Você é o ponto. A faixa vermelha é onde eu daria bronca; as manchas verdes são os lugares onde você trabalha.', tuned:t=>`ajuste fino: cabeça ${t.pitch >= 0 ? '+' : ''}${t.pitch}° · olhar ${t.gaze >= 0 ? '+' : ''}${t.gaze}`,
+    focus:'🎯 Foco', f_stop:'⏹ Parar foco', pill_focus:'em foco', focus_chip:(t,s)=>`🎯 ${t} · ${s ? s + (s === 1 ? ' escapada' : ' escapadas') : 'sem escapadas'}`, focus_meta:'foco concluído', upd_new:'Há uma versão nova do on-duty. Rode ./onduty update no terminal.',
+    sl_meeting:'Reunião em andamento. Não atrapalho. 🎧', stamp_meeting:'EM REUNIÃO', pill_meeting:'em reunião',
     cal_btn:'📐 Calibrar', cal_btn_ok:'📐 Recalibrar', cam_menu:'🎥 Câmera', mirror:'↔ Espelhar', unmirror:'↔ Sem espelho', level:'📐 Endireitar (sente reto)', leveling:'Medindo… sente reto', unlevel:'↺ Zerar inclinação', lv_ok:'Câmera endireitada.', lv_no:'Não vi seu rosto: nada mudou.',
     pause:'⏸ Pausar', resume:'▶ Retomar', p1h:'Por 1 hora', ptom:'Até amanhã', blur:'Borrar câmera', unblur:'Mostrar câmera', test:'Testar alerta', photo:'📸 Tirar foto', download:'Baixar', copy:'Copiar', share:'Compartilhar', close:'Fechar',
     head:'Cabeça vs. seu normal', gaze:'Olhar pra baixo vs. normal', downwin:'Olhando pra baixo (janela)', idlelbl:'Sem teclado/mouse', phonelbl:'Celular na câmera (YOLO)',
@@ -262,6 +267,8 @@ const STR = {
     cal_never:'I haven’t calibrated to you yet. It takes 40 s and makes a big difference.', cal_new:'New setup detected (different screen or camera). Recalibrate?', cal_drift:'Your posture, camera or laptop seems to have moved. Recalibrate?', cal_go:'📐 Calibrate',
     hl_camera:'I can’t open the camera (laptop closed? another app using it? permission?).', hl_dark:'It’s dark: I can’t see you well.', hl_blocked:'I barely see you while you type: camera covered or out of position?',
     fb_no:'🙅 I wasn’t on my phone', fb_miss:'📱 You missed one', fb_no_t:'Noted: I’ll be more relaxed.', fb_miss_t:'Noted: I’ll be stricter.', radar_hint:'You’re the dot. The red band is where I’d nag; the green blobs are where you work.', tuned:t=>`fine-tuning: head ${t.pitch >= 0 ? '+' : ''}${t.pitch}° · gaze ${t.gaze >= 0 ? '+' : ''}${t.gaze}`,
+    focus:'🎯 Focus', f_stop:'⏹ Stop focus', pill_focus:'focus', focus_chip:(t,s)=>`🎯 ${t} · ${s ? s + (s === 1 ? ' slip' : ' slips') : 'no slips'}`, focus_meta:'focus done', upd_new:'A new version of on-duty is available. Run ./onduty update in a terminal.',
+    sl_meeting:'In a meeting. I’ll stay out of the way. 🎧', stamp_meeting:'IN A MEETING', pill_meeting:'in a meeting',
     cal_btn:'📐 Calibrate', cal_btn_ok:'📐 Recalibrate', cam_menu:'🎥 Camera', mirror:'↔ Mirror', unmirror:'↔ No mirror', level:'📐 Straighten (sit upright)', leveling:'Measuring… sit upright', unlevel:'↺ Reset tilt', lv_ok:'Camera straightened.', lv_no:'I couldn’t see your face: nothing changed.',
     pause:'⏸ Pause', resume:'▶ Resume', p1h:'For 1 hour', ptom:'Until tomorrow', blur:'Blur camera', unblur:'Show camera', test:'Test alert', photo:'📸 Snap', download:'Download', copy:'Copy', share:'Share', close:'Close',
     head:'Head vs. your normal', gaze:'Looking down vs. normal', downwin:'Looking down (window)', idlelbl:'No keyboard/mouse', phonelbl:'Phone in camera (YOLO)',
@@ -297,6 +304,9 @@ const clockFmt = ms => { const s = Math.max(0, Math.floor(ms / 1000)), h = Math.
 $('test').onclick = () => fetch('/test', {method:'POST'});
 $('blur').onclick = () => { fetch('/blur', {method:'POST'}); $('cmenu').classList.remove('on'); };
 $('camBtn').onclick = () => $('cmenu').classList.toggle('on');
+$('focusBtn').onclick = () => { if ($('focusBtn').dataset.active) post('/api/focus', {action:'stop'}); else $('fmenu').classList.toggle('on'); };
+document.querySelectorAll('#fmenu [data-f]').forEach(b => b.onclick = () => { post('/api/focus', {action:'start', minutes:+b.dataset.f}); $('fmenu').classList.remove('on'); });
+$('fstop').onclick = () => { post('/api/focus', {action:'stop'}); $('fmenu').classList.remove('on'); };
 $('level').onclick = () => { fetch('/api/level', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'}); $('cmenu').classList.remove('on'); };
 $('unlevel').onclick = () => { fetch('/api/config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({rotate:0})}); $('cmenu').classList.remove('on'); };
 $('mirror').onclick = async () => { const on = !(await (await fetch('/status')).json()).mirror; await fetch('/api/config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({mirror:on})}); $('cmenu').classList.remove('on'); };
@@ -305,7 +315,7 @@ $('fbNo').onclick = () => feedback('false_positive'); $('fbMiss').onclick = () =
 const post = (path, body) => fetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body || {})});
 $('pause').onclick = () => { if ($('pause').dataset.paused) post('/api/pause', {minutes:0}); else $('pmenu').classList.toggle('on'); };
 document.querySelectorAll('#pmenu button').forEach(b => b.onclick = () => { post('/api/pause', {minutes:b.dataset.m === 'tomorrow' ? 'tomorrow' : +b.dataset.m}); $('pmenu').classList.remove('on'); });
-addEventListener('click', e => { if (!e.target.closest('.menuwrap')) { $('pmenu').classList.remove('on'); $('cmenu').classList.remove('on'); } });
+addEventListener('click', e => { if (!e.target.closest('.menuwrap')) { $('pmenu').classList.remove('on'); $('cmenu').classList.remove('on'); $('fmenu').classList.remove('on'); } });
 
 /* ---------- toast + fx ---------- */
 let toastT;
@@ -377,9 +387,10 @@ function onSaid(s) {
   const d = s.said; if (!d || d.id === lastId) return;
   const first = lastId === 0; lastId = d.id;
   if (first && Date.now() / 1000 - d.t > 25) return;  // old line from before the page opened
-  const meta = d.kind === 'back' ? L.back_meta(mins(d.minutes)) : d.kind === 'test' ? `${L.test_meta} · ${L.lvl_of(d.level)}` : `${L.lvl_of(d.level)} · ${L.lvl[d.level - 1]}`;
+  const meta = d.kind === 'focus_done' ? L.focus_meta : d.kind === 'back' ? L.back_meta(mins(d.minutes)) : d.kind === 'test' ? `${L.test_meta} · ${L.lvl_of(d.level)}` : `${L.lvl_of(d.level)} · ${L.lvl[d.level - 1]}`;
   lastLine = null; typeLine(d.text, meta);
   grabFrame().then(img => { moment = {img, text:d.text, level:d.kind === 'back' ? 0 : d.level, kind:d.kind, minutes:d.minutes, t:d.t}; });
+  if (d.kind === 'focus_done') { confetti(); setTimeout(confetti, 600); }
   if (d.kind === 'back') { confetti(); if (d.minutes >= 1) setTimeout(() => toast(L.toast_photo), 1200); }
   if (!first && d.kind !== 'back' && d.level >= 4) { $('photo').classList.add('hot'); toast(L.toast_photo); }
 }
@@ -387,8 +398,9 @@ function onSaid(s) {
 let bannerOff = false, radar = null, lastLevelNote = null;
 function banner(s) {
   const c = s.calibration || {}, h = s.camera_ok === false && s.mode === 'active' && s.onboarded ? 'camera' : (s.health || [])[0];
-  const msg = h ? L['hl_' + h] : s.mode !== 'active' || !s.onboarded ? '' : c.state === 'never' ? L.cal_never : c.state === 'new_setup' ? L.cal_new : c.state === 'drift' ? L.cal_drift : '';
-  $('banner').style.display = msg && !bannerOff ? 'flex' : 'none'; $('bmsg').textContent = msg; $('bgo').textContent = L.cal_go; $('bgo').style.display = h ? 'none' : '';
+  const upd = s.update && s.update.behind > 0;
+  const msg = h ? L['hl_' + h] : upd && s.mode === 'active' ? L.upd_new : s.mode !== 'active' || !s.onboarded ? '' : c.state === 'never' ? L.cal_never : c.state === 'new_setup' ? L.cal_new : c.state === 'drift' ? L.cal_drift : '';
+  $('banner').style.display = msg && !bannerOff ? 'flex' : 'none'; $('bmsg').textContent = msg; $('bgo').textContent = L.cal_go; $('bgo').style.display = h || upd ? 'none' : '';
 }
 $('bx').onclick = () => { bannerOff = true; $('banner').style.display = 'none'; };
 
@@ -405,6 +417,7 @@ async function tick() {
     const at = s.resume_at ? new Date(s.resume_at * 1000).toLocaleString(loc(), {weekday: new Date(s.resume_at * 1000).toDateString() === new Date().toDateString() ? undefined : 'short', hour:'2-digit', minute:'2-digit'}) : '';
     if (sleepy) { key = 'sleep'; pal = SLEEP; stampc = '#6366f1';
       const M = {asleep:[L.pill_asleep, L.stamp_sleep, L.sl_asleep], away:[L.pill_away, L.stamp_sleep, L.sl_away], paused:[L.pill_paused, L.stamp_pause, L.sl_paused(at)],
+        meeting:[L.pill_meeting, L.stamp_meeting, L.sl_meeting],
         offduty:[L.pill_off, L.stamp_off, s.mode_why === 'break' ? L.sl_break(at) : s.mode_why === 'day' ? L.sl_day(at) : L.sl_hours(at)]}[s.mode] || [s.mode, s.mode, ''];
       st = [M[0], '--mute']; stamp = M[1]; idle = M[2]; }
     else if (!s.calibrated) { key = 'calib'; pal = CALIB; st = [L.st_calib, '--warn']; stamp = L.stamp_calib; stampc = '#64748b'; idle = L.idle_calib; }
@@ -417,6 +430,7 @@ async function tick() {
     if (s.said && s.said.kind === 'back' && now / 1000 - s.said.t < 20 && !s.scrolling) { key = 'back'; pal = PAL[0]; }
     setStage(key, lvl, pal);
     banner(s);
+    { const f = s.focus; $('focusBtn').dataset.active = f ? '1' : ''; $('focusBtn').textContent = f ? '⏹ ' + clockFmt(f.end * 1000 - Date.now()) : L.focus; const ch = $('focusChip'); ch.style.display = f ? '' : 'none'; if (f) ch.textContent = L.focus_chip(clockFmt(f.end * 1000 - Date.now()), f.slips); }
     { const cs = (s.calibration || {}).state, need = s.onboarded && cs && cs !== 'ok'; $('calLink').classList.toggle('need', !!need); $('calLink').textContent = need ? L.cal_btn : L.cal_btn_ok; }
     $('fbNo').style.display = s.scrolling ? '' : 'none'; $('fbNo').textContent = L.fb_no; $('fbMiss').textContent = L.fb_miss; $('radarHint').textContent = L.radar_hint;
     $('tuned').textContent = s.calibration && s.calibration.tuning && (s.calibration.tuning.pitch || s.calibration.tuning.gaze) ? L.tuned(s.calibration.tuning) : '';
@@ -425,6 +439,7 @@ async function tick() {
     onSaid(s);
     if (sleepy || (!recent && !s.scrolling && !demo)) showStatic(idle || L.idle_work(NAME));
     $('pill').textContent = st[0]; $('pill').style.background = css(st[1]);
+    if (s.focus && !sleepy && !s.scrolling) { $('pill').textContent = '🎯 ' + L.pill_focus; $('pill').style.background = css('--acc'); }
     const stp = $('stamp'); if (stp.textContent !== stamp) { stp.textContent = stamp; stp.classList.remove('bad'); void stp.offsetWidth; if (s.scrolling) stp.classList.add('bad'); }
     stp.style.setProperty('--stampc', stampc);
     $('capName').textContent = NAME || 'on-duty'; $('capTime').textContent = new Date().toLocaleTimeString(loc(), {hour:'2-digit', minute:'2-digit'});

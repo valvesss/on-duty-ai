@@ -13,8 +13,6 @@ touch the keyboard again.
 
 import argparse
 import collections
-import ctypes
-import ctypes.util
 import datetime as dt
 import importlib
 import json
@@ -23,6 +21,7 @@ import platform
 import random
 import statistics
 import subprocess
+import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -36,6 +35,9 @@ from mediapipe.tasks.python import BaseOptions, vision
 import calibration
 import config
 import db
+import logic
+import osal
+import stats
 
 HERE = Path(__file__).resolve().parent
 PHONE_CLASS = 67  # COCO "cell phone"
@@ -47,8 +49,10 @@ STATE: dict = {"status": {}, "jpeg": b"", "events": collections.deque(maxlen=30)
                "reload": False, "pause_until": 0.0, "preview": None, "cmds": collections.deque()}
 
 T = {  # the few strings the engine says outside the phrase packs
-    "pt_BR": {"level": "Nível {lv} de 5", "sec": "{n} segundos", "min1": "1 minuto", "min": "{n} minutos"},
-    "en_US": {"level": "Level {lv} of 5", "sec": "{n} seconds", "min1": "1 minute", "min": "{n} minutes"},
+    "pt_BR": {"focus_done": "Foco concluído: {m} e {s}.", "slips0": "nenhuma escapada", "slips1": "1 escapada", "slipsN": "{n} escapadas",
+              "level": "Nível {lv} de 5", "sec": "{n} segundos", "min1": "1 minuto", "min": "{n} minutos"},
+    "en_US": {"focus_done": "Focus done: {m} and {s}.", "slips0": "no slips", "slips1": "1 slip", "slipsN": "{n} slips",
+              "level": "Level {lv} of 5", "sec": "{n} seconds", "min1": "1 minute", "min": "{n} minutes"},
 }
 
 
@@ -65,13 +69,7 @@ HHMM = __import__("re").compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
 
 def voices() -> list[dict]:
-    out = subprocess.run(["say", "-v", "?"], capture_output=True, text=True).stdout
-    res = []
-    for line in out.splitlines():
-        head = line.split("#")[0].split()
-        if len(head) >= 2 and head[-1][:2] in ("pt", "en"):
-            res.append({"name": " ".join(head[:-1]), "locale": head[-1]})
-    return res
+    return osal.list_voices()
 
 
 def sample_line(lang: str, tone: str, name: str) -> str:
@@ -122,26 +120,25 @@ def next_on(now: dt.datetime) -> int:
     return 0
 
 
-_cg = ctypes.CDLL(ctypes.util.find_library("CoreGraphics"))
-_cg.CGMainDisplayID.restype = ctypes.c_uint32
-_cg.CGDisplayIsAsleep.argtypes = [ctypes.c_uint32]
+idle_seconds, system_asleep, display_count = osal.idle_seconds, osal.system_asleep, osal.display_count
 
 
-_cg.CGGetActiveDisplayList.argtypes = [ctypes.c_uint32, ctypes.POINTER(ctypes.c_uint32), ctypes.POINTER(ctypes.c_uint32)]
+def check_updates() -> None:
+    """`git fetch` and count the commits we're behind. Only runs when the user turned update_check on (or asked once)."""
+    try:
+        subprocess.run(["git", "-C", str(HERE), "fetch", "--quiet", "origin", "main"], timeout=60, check=True, capture_output=True)
+        behind = int(subprocess.run(["git", "-C", str(HERE), "rev-list", "--count", "HEAD..origin/main"], capture_output=True, text=True, check=True).stdout)
+        STATE["update"] = {"behind": behind, "checked": int(time.time())}
+    except (subprocess.SubprocessError, ValueError, OSError):
+        STATE["update"] = {"behind": 0, "checked": int(time.time()), "error": True}
 
 
-def display_count() -> int:
-    n, buf = ctypes.c_uint32(0), (ctypes.c_uint32 * 16)()
-    _cg.CGGetActiveDisplayList(16, buf, ctypes.byref(n))
-    return max(1, n.value)
-
-
-def system_asleep() -> bool:
-    """Display asleep, screen locked, or another user's session is in front."""
-    if _cg.CGDisplayIsAsleep(_cg.CGMainDisplayID()):
-        return True
-    root = subprocess.run(["ioreg", "-n", "Root", "-d1"], capture_output=True, text=True).stdout
-    return '"IOConsoleLocked" = Yes' in root or '"kCGSSessionOnConsoleKey"=No' in root
+def update_loop() -> None:
+    time.sleep(90)
+    while True:
+        if CFG.get("update_check"):
+            check_updates()
+        time.sleep(6 * 3600)
 
 
 class Camera:
@@ -290,6 +287,14 @@ class Dashboard(BaseHTTPRequestHandler):
             self._json({"version": m.group(1) if m else "?", "port": CFG["port"], "events": db.count_events(), "db": str(db.DB_PATH), "config": str(config.CONFIG_PATH)})
         elif path == "/api/export":
             self._send(db.export_ndjson(), "application/x-ndjson", headers={"Content-Disposition": 'attachment; filename="on-duty-history.ndjson"'})
+        elif path == "/api/summary":
+            days = max(1, min(30, int(args.get("days", 7))))
+            since = int(time.time()) - (days * 2 + 1) * 86400
+            self._json(stats.summarize(db.events_since(since), db.focus_rows(since), time.time(), days))
+        elif path == "/api/login_item":
+            self._json({"enabled": osal.login_item_enabled()})
+        elif path == "/summary":
+            self._send((HERE / "summary.html").read_bytes(), "text/html; charset=utf-8")
         elif path == "/settings":
             self._send((HERE / "settings.html").read_bytes(), "text/html; charset=utf-8")
         elif path == "/api/sample":
@@ -335,6 +340,13 @@ class Dashboard(BaseHTTPRequestHandler):
         elif self.path == "/api/phrases" and body.get("action") == "remove":
             config.CUSTOM_PHRASES.unlink(missing_ok=True)
             STATE["reload"] = True
+        elif self.path == "/api/focus":  # {"action": "start", "minutes": 25} | {"action": "stop"}
+            STATE["cmds"].append({"action": "focus_" + str(body.get("action", "stop")), "minutes": body.get("minutes", 25)})
+        elif self.path == "/api/login_item":
+            osal.set_login_item(bool(body.get("enabled", True)))
+            return self._json({"enabled": osal.login_item_enabled()})
+        elif self.path == "/api/update_check":
+            threading.Thread(target=check_updates, daemon=True).start()
         elif self.path == "/api/level":  # measure the camera tilt from your eye line (sit upright for 3 s)
             STATE["cmds"].append({"action": "level"})
         elif self.path == "/api/calibrate":  # start | finish | cancel | reset | discard — handled by the engine loop
@@ -344,16 +356,8 @@ class Dashboard(BaseHTTPRequestHandler):
                 STATE["preview"].kill()
             voice = body.get("voice") or config.voice(CFG)
             if voice in {v["name"] for v in voices()}:
-                STATE["preview"] = subprocess.Popen(["say", "-v", voice, "-r", "190", str(body.get("text", ""))[:300]])
-        self._send(b"ok", "text/plain")
-
-
-def idle_seconds() -> float:
-    out = subprocess.run(["ioreg", "-c", "IOHIDSystem"], capture_output=True, text=True).stdout
-    for line in out.splitlines():
-        if "HIDIdleTime" in line:
-            return int(line.rsplit("=", 1)[1]) / 1e9
-    return 0.0
+                STATE["preview"] = osal.speak(voice, 190, [str(body.get("text", ""))[:300]])
+        self._json({"ok": True})
 
 
 def load_phrases(cfg: dict) -> tuple[list, dict]:
@@ -387,6 +391,7 @@ class Nagger:
         self.t = T.get(cfg["lang"], T["en_US"])
         self.levels, self.back = load_phrases(cfg)
         self.proc, self.ended, self.bags = None, 0.0, {}
+        self.focus = False  # inside a focus block: starts at level 2 and nags faster
 
     def tempo(self, minutes: float) -> str:
         sec = round(minutes * 60)
@@ -413,8 +418,7 @@ class Nagger:
         if self.voice_on:
             if self.proc and self.proc.poll() is None:
                 self.proc.kill()
-            self.proc = subprocess.Popen(["say", "-v", self.voice, "-r", str(self.RATE[level]),
-                                          " [[slnc 600]] ".join(lines)])
+            self.proc = osal.speak(self.voice, self.RATE[level], lines)
         text = " ".join(lines)
         STATE["said_id"] += 1  # the dashboard types this out live
         STATE["said"] = {"id": STATE["said_id"], "text": text, "level": level + 1, "kind": kind,
@@ -422,24 +426,24 @@ class Nagger:
         return text
 
     def level(self, n: int) -> int:
-        return min(self.tone["cap"], self.tone["start"] + max(0, n - 1) // self.tone["per"])
+        start = max(self.tone["start"], 1) if self.focus else self.tone["start"]
+        return min(self.tone["cap"], start + max(0, n - 1) // self.tone["per"])
 
     def shut_up(self) -> None:
         if self.proc and self.proc.poll() is None:
             self.proc.kill()
 
     def ready(self, n: int) -> bool:
-        return not self.speaking() and time.time() - self.ended >= self.GAP[self.level(n)] * self.tone["gap"]
+        return not self.speaking() and time.time() - self.ended >= self.GAP[self.level(n)] * self.tone["gap"] * (0.8 if self.focus else 1.0)
 
     def nag(self, n: int, minutes: float) -> str:
         lv = self.level(n)
         if n == 1 or lv != self.level(n - 1):  # notification only at the start and on level-up
             title = f"📵 on-duty{' · ' + self.cfg['name'] if self.cfg['name'] else ''}"
             if self.cfg["notifications"]:
-                subprocess.Popen(["osascript", "-e", f'display notification "{self.t["level"].format(lv=lv + 1)}" '
-                                                     f'with title "{title}" sound name "Basso"'])
+                osal.notify(title, self.t["level"].format(lv=lv + 1))
         if lv >= 2 and self.cfg["sound_effects"]:
-            subprocess.Popen(["afplay", "-v", str(lv), "/System/Library/Sounds/Sosumi.aiff"])
+            osal.play_alert(lv)
         return self.say(self._pick(lv, self.levels[lv]), lv, minutes, n)
 
     def welcome(self, minutes: float) -> str:
@@ -469,7 +473,7 @@ def head_pose(lm: vision.FaceLandmarker, frame) -> Pose | None:
 def load_yolo(cfg: dict):
     if not cfg["phone_detection"]:
         return None
-    if platform.machine() != "arm64":
+    if sys.platform == "darwin" and platform.machine() != "arm64":
         log("phone detection off: needs Apple Silicon (PyTorch has no Intel macOS builds)")
         return None
     try:
@@ -482,7 +486,7 @@ def load_yolo(cfg: dict):
 
 AWAY_IDLE = 180    # s without input AND ...
 AWAY_NOFACE = 120  # ... s without seeing a face → release the camera and sleep until you touch the machine
-SLEEP_POLL = {"asleep": 3, "paused": 5, "offduty": 15, "away": 1}
+SLEEP_POLL = {"asleep": 3, "paused": 5, "offduty": 15, "away": 1, "meeting": 3}
 BLANK = cv2.imencode(".jpg", np.zeros((360, 480, 3), np.uint8))[1].tobytes()
 
 
@@ -533,17 +537,37 @@ def main() -> None:
     streak_start, n_nags, last_seen_t, last_phone_t = None, 0, time.time(), 0.0
     last_down, last_face_t, last_dbg, last_save = False, 0.0, 0.0, time.time()
     mode, away, camera_ok = "active", False, False
+    meeting_deb = logic.Debounce(on=3, off=3)
+    focus: logic.FocusSession | None = None
+    STATE["focus_done"], STATE["update"] = None, None
+    threading.Thread(target=update_loop, daemon=True).start()
     srv = ThreadingHTTPServer(("127.0.0.1", CFG["port"]), Dashboard)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     log(f"on-duty running · http://localhost:{CFG['port']}{'' if CFG['onboarded'] else '/setup'} · voice {nag.voice} · "
         f"phone detection {'on' if yolo else 'off'}")
+
+    def focus_status():
+        return {"active": True, "t0": int(focus.t0), "end": int(focus.end), "minutes": focus.minutes, "slips": focus.slips} if focus else None
+
+    def end_focus(now: float) -> None:
+        nonlocal focus
+        rec = focus.finish(now)
+        db.record_focus(rec)
+        STATE["focus_done"] = {**rec, "t": int(now)}
+        tr = T.get(CFG["lang"], T["en_US"])
+        slips = tr["slips0"] if not rec["slips"] else tr["slips1"] if rec["slips"] == 1 else tr["slipsN"].format(n=rec["slips"])
+        log(f"🎯 focus {'done' if rec['completed'] else 'stopped'}: {rec['actual']} of {rec['planned']:.0f} min, {rec['slips']} slip(s), {rec['phone_min']} min on the phone")
+        if rec["completed"]:
+            mins_txt = tr["min1"] if round(rec["actual"]) == 1 else tr["min"].format(n=round(rec["actual"]))
+            nag.say(tr["focus_done"].format(m=mins_txt, s=slips), 0, kind="focus_done")
+        focus = None
 
     def publish_sleep(m: str, why: str = "") -> None:
         now = time.time()
         STATE["status"] = {**STATE["status"], "t": int(now), "mode": m, "mode_why": why, "name": CFG["name"], "lang": CFG["lang"],
                            "onboarded": CFG["onboarded"], "scrolling": False, "level": 0, "nags": 0, "phone_min": 0,
                            "resume_at": STATE["pause_until"] and int(STATE["pause_until"]) or (next_on(dt.datetime.now()) if m == "offduty" else 0),
-                           "blur": STATE["blur"], "said": STATE["said"], "mirror": CFG["mirror"]}
+                           "blur": STATE["blur"], "said": STATE["said"], "mirror": CFG["mirror"], "focus": focus_status(), "focus_done": STATE["focus_done"], "update": STATE["update"]}
 
     try:
         while True:
@@ -587,6 +611,14 @@ def main() -> None:
                         streak_start, n_nags, grace_until = None, 0, t0 + 60
                     th = eff_th()
                     log(f"feedback {kind}: tuning now {tuning} → pitch_delta {th['pitch_delta']}, gaze_delta {th['gaze_delta']}")
+                elif act == "focus_start" and CFG["onboarded"]:
+                    if focus:
+                        end_focus(t0)
+                    focus = logic.FocusSession(max(1.0, min(240.0, float(c.get("minutes", 25)))), t0)
+                    STATE["focus_done"] = None
+                    log(f"🎯 focus started: {focus.minutes:.0f} min")
+                elif act == "focus_stop" and focus:
+                    end_focus(t0)
                 elif act == "level" and mode == "active" and CAM.is_open:
                     level_ses = {"t0": t0, "vals": []}
                 elif act == "unphone":
@@ -627,9 +659,17 @@ def main() -> None:
                     cap_ses, cal, cal_until = None, {"zones": [], "phone": None, "last": None}, 0.0
             th = eff_th()
             calibrating = cal_until > t0
+            if focus and focus.done(t0):
+                end_focus(t0)
+            nag.focus = focus is not None
+            in_meeting = meeting_deb.update(CFG["onboarded"] and CFG["pause_in_meetings"] and osal.mic_in_use())
             if system_asleep():
                 new_mode, why = "asleep", "screen"
             elif calibrating:
+                new_mode, why = "active", ""
+            elif in_meeting:  # an app is capturing the microphone: a call. Stay quiet and free the camera.
+                new_mode, why = "meeting", ""
+            elif focus:  # a focus block runs even outside work hours
                 new_mode, why = "active", ""
             elif STATE["pause_until"] > t0:
                 new_mode, why = "paused", ""
@@ -764,9 +804,13 @@ def main() -> None:
                 said = nag.welcome(mins) if n_nags else ""
                 log(f"✅ back ({mins:.1f} min on the phone, {n_nags} lines) {said}")
                 db.record("back", start=int(streak_start), minutes=round(mins, 2), n=n_nags, said=said)
+                if focus:
+                    focus.add_phone(mins)
                 streak_start, n_nags = None, 0
             elif CFG["onboarded"] and not calibrating and now > grace_until and (phone_now or face_now) and not streak_start:  # the wizard never nags
                 streak_start = now - (2 if phone_now else th["window"] * th["down_ratio"])
+                if focus:
+                    focus.slip()
             if streak_start and now - last_seen_t < 20 and nag.ready(n_nags + 1):
                 # keeps talking until you're back (pauses if you walked away from the camera)
                 n_nags += 1
@@ -841,6 +885,7 @@ def main() -> None:
                 "nags": n_nags, "calibrated": base is not None, "work_samples": len(work_pitch),
                 "phone_min": round((now - streak_start) / 60, 1) if streak_start else 0, "cfg": th,
                 "blur": STATE["blur"], "said": STATE["said"], "mirror": CFG["mirror"], "rotate": CFG["rotate"],
+                "focus": focus_status(), "focus_done": STATE["focus_done"], "update": STATE["update"],
                 "level": level_ses and {"progress": min(1.0, (now - level_ses["t0"]) / 3)},
             }
             STATE["series"].append([int(now), dpitch, gaze - gbase if gaze is not None else None, down,

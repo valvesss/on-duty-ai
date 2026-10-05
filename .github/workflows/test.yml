@@ -1,0 +1,10 @@
+name: tests
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: macos-latest   # the only supported platform for now; add ubuntu/windows here when a port lands
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync
+      - run: uv run python -m unittest discover -s tests -v

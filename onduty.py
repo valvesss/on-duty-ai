@@ -98,6 +98,7 @@ def cmd_install(_a) -> None:
         sh("launchctl", "bootout", f"gui/{UID}/com.valvesss.onduty", stderr=subprocess.DEVNULL)
         legacy.unlink()
     unload()
+    sh("launchctl", "enable", f"gui/{UID}/{LABEL}", stderr=subprocess.DEVNULL)  # undo a "don't start at login" from Settings
     sh("pkill", "-f", f"{DIR}/on_duty.py")  # bootout doesn't always take down the app `open` launched
     sh("launchctl", "bootstrap", f"gui/{UID}", str(PLIST), check=True)
     cfg = config.load()
@@ -111,8 +112,24 @@ def cmd_install(_a) -> None:
             time.sleep(1)
     else:
         sys.exit(f"the service didn't come up; see {LOG}")
-    sh("open", url + ("" if cfg["onboarded"] else "/setup"))
-    print(f"opened {url}{'' if cfg['onboarded'] else '/setup — finish the setup there'}")
+    if not getattr(_a, "updating", False):
+        sh("open", url + ("" if cfg["onboarded"] else "/setup"))
+    if not getattr(_a, "updating", False):
+        print(f"opened {url}{'' if cfg['onboarded'] else '/setup — finish the setup there'}")
+    else:
+        print(f"running at {url}")
+
+
+def cmd_update(_a) -> None:
+    """Pull the latest version and reinstall the service in place (your config and history are untouched)."""
+    if not (DIR / ".git").exists():
+        sys.exit("this folder isn't a git clone, so there's nothing to pull. Reinstall with install.sh.")
+    before = subprocess.run(["git", "-C", str(DIR), "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
+    sh("git", "-C", str(DIR), "pull", "--ff-only", check=True)
+    after = subprocess.run(["git", "-C", str(DIR), "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
+    print("already up to date" if before == after else f"updated {before} → {after}")
+    _a.updating = True
+    cmd_install(_a)
 
 
 def cmd_uninstall(_a) -> None:
@@ -273,6 +290,7 @@ def main() -> None:
                         ("doctor", cmd_doctor, "check the setup")]:
         sub.add_parser(name, help=h).set_defaults(fn=fn)
     sub.add_parser("open", help="open the dashboard").set_defaults(fn=cmd_open)
+    sub.add_parser("update", help="pull the latest version and reinstall the service").set_defaults(fn=cmd_update)
     sub.add_parser("recalibrate", help="recalibrate for this desk / monitors / camera").set_defaults(fn=cmd_recalibrate)
     sub.add_parser("test", help="run the unit tests").set_defaults(fn=cmd_test)
     pz = sub.add_parser("pause", help="pause: <minutes> | tomorrow | 0 (resume)")

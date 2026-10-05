@@ -41,6 +41,8 @@ git clone https://github.com/valvesss/on-duty-ai && cd on-duty-ai && ./onduty in
 | 🧭 **First-run wizard** | Name, language, how hard it should push, your work hours and breaks, voice, and a live camera check. Opens by itself after install. |
 | 🎭 **A live stage** | A mascot whose face — and the whole page's mood — escalates with every nag. The line being spoken **types out live** in a speech bubble. |
 | 📸 **Shareable moments** | One click turns a moment (or any line from the *Hall of shame*) into a 4:5 "caught red-handed" card for stories and group chats. |
+| 🎯 **Focus blocks** | Start a 25/50/90-minute block: it nags a bit harder inside it, counts your slips, celebrates when you finish, and logs it. |
+| 📊 **Your week** | Time on the phone per day, an hour-of-day heatmap, trend vs. the previous period, longest session, best/worst day, and your focus blocks. |
 | 😴 **Not always on** | Sleeps — camera light off — when your screen sleeps or locks, outside your work hours, on breaks, or when you've walked away. |
 | 📐 **Calibration that adapts** | Zones for each monitor, a personal sensitivity, and automatic detection when you move, dock, or switch camera. |
 | 🧠 **Lines that sound like you** | Your AI assistant can write the phrases from what it already knows about you. |
@@ -82,6 +84,7 @@ on-duty isn't a background hog. It drops the camera and goes quiet when:
 | Situation | Behavior |
 |---|---|
 | Screen asleep, locked, or another user's session in front | Camera released, polls every few seconds |
+| An app is using the microphone (a call) | Quiet and camera released until the call ends (turn off with `pause_in_meetings`) |
 | Outside your work days/hours, or during a break | Camera released, wakes by itself at the next window |
 | You paused it (⏸ in the dashboard, or `./onduty pause 60`) | Camera released until it expires |
 | No face for 2 min *and* no input for 3 min | Camera released until you touch the Mac |
@@ -97,6 +100,7 @@ Open <http://localhost:4269> and keep it on a second monitor.
 - **📸 Snap** — builds the shareable card; download, copy, or share. Level 4–5 lines make the button pulse: those are the ones worth posting.
 - **Hall of shame** — today's heaviest lines, one tap each from becoming a card.
 - History charts, focus streak, and a collapsible panel with the raw signals and the live head-pose radar.
+- **🎯 Focus** starts a timed block (25/50/90 min) with a countdown; **📊** opens your week.
 - **📐 Calibrate** is always in the header (amber and pulsing when this setup needs it). **⚙** opens **Settings**; **⏸** pauses for an hour or until tomorrow.
 
 ## Personalize the lines
@@ -136,10 +140,36 @@ Each setup keeps its own saved calibration in `~/.on-duty/on-duty.db`.
 
 Two buttons keep it honest. **🙅 I wasn't on my phone** (on the stage while it nags) stops the nag, pauses it for a minute and makes the trigger more relaxed; **📱 You missed one** (in the dashboard's details) makes it stricter. The adjustment is saved per setup and reset when you recalibrate.
 
+## Focus blocks, meetings and your week
+
+- **🎯 Focus** (dashboard header): pick 25, 50 or 90 minutes. Inside a block it starts at level 2 and nags 20% faster, runs even outside your work hours, counts every slip and the minutes lost, says a closing line when you finish, and saves the block. Stop early any time.
+- **Calls:** when another app captures your microphone (Zoom, Meet, Teams, a recorder…), on-duty goes quiet and frees the camera, then resumes on its own. It reads only the "microphone is in use" flag from the OS: it never listens, and it doesn't know which app it is.
+- **📊 Your week** (`/summary`): minutes per day, when it happens (hour × day heatmap), trend against the previous period (7/14/30 days), best and worst day, and focus blocks. *Copy as text* makes a shareable summary.
+
+## Updating
+
+```bash
+./onduty update      # git pull + reinstall the service in place; your config, calibration and history are kept
+```
+
+Want a heads-up? Turn on **Check for updates daily** in Settings: it runs a `git fetch` from GitHub (off by default, the only optional network call) and shows a banner when there's something new.
+
+## Platform support and contributing
+
+| | Status |
+|---|---|
+| macOS (Apple Silicon and Intel) | ✅ supported |
+| Linux, Windows | 🙋 **welcome contributions.** All OS-specific code lives behind [`osal.py`](osal.py) plus the service in [`onduty.py`](onduty.py); [CONTRIBUTING.md](CONTRIBUTING.md) has the contract for each function and ideas per OS. |
+
+```bash
+./onduty test        # 60+ unit and API tests: calibration math, detection rules, focus, weekly stats, the HTTP API
+```
+
 ## Commands
 
 ```text
 ./onduty install | uninstall      install / remove the background service (starts at login)
+./onduty update                   pull the latest version and reinstall in place
 ./onduty start | stop | restart   control it
 ./onduty open                     open the dashboard
 ./onduty setup                    open Settings (the first-run wizard is at /setup)
@@ -171,6 +201,8 @@ Everything also lives in `~/.on-duty/config.json`.
 | `rotate` | `0` | Degrees to straighten a tilted camera (set by *Straighten*) |
 | `phone_detection` | `true` | The YOLO phone detector |
 | `notifications` / `sound_effects` | `true` | macOS notification on start and escalation; the alert sound from level 3 |
+| `pause_in_meetings` | `true` | Stay quiet and free the camera while an app uses the microphone |
+| `update_check` | `false` | Opt-in daily `git fetch` to tell you about a new version |
 | `retention_days` | `365` | Events older than this are deleted at startup (`0` = keep forever) |
 | `port` | `4269` | Dashboard at `http://localhost:<port>` (restart after changing) |
 | `custom_phrases_only` | `false` | Use only your `phrases.json` instead of mixing with the built-ins |
@@ -197,7 +229,7 @@ Phone detection needs Apple Silicon and decent light. Check `./onduty doctor`, a
 
 <details><summary><b>Does anything leave my Mac?</b></summary>
 
-No. Frames are processed in memory, the dashboard only listens on `127.0.0.1`, and there is no telemetry. The only downloads happen at install: Python packages and the two model files.
+No. Frames are processed in memory, the dashboard only listens on `127.0.0.1`, and there is no telemetry. The only downloads happen at install (Python packages and the two model files), plus the opt-in update check if you turn it on.
 </details>
 
 <details><summary><b>Uninstall</b></summary>

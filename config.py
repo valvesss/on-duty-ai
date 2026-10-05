@@ -23,6 +23,8 @@ DEFAULTS = {
     "lang": "pt_BR",          # pt_BR | en_US
     "voice": "",              # empty = default voice for the language (see VOICES)
     "voice_on": True,         # false = notifications + dashboard only
+    "pause_in_meetings": True,  # stay quiet (and release the camera) while an app is using the microphone: a call
+    "update_check": False,    # opt-in: once a day, `git fetch` from GitHub to tell you a new version exists
     "notifications": True,    # macOS notification when it starts and when it levels up
     "sound_effects": True,    # the alert sound from level 3
     "tone": "balanced",       # friendly | balanced | ruthless | chaos
