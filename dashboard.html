@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>on-duty</title>
-<script src="/radar.js?v=2"></script>
+<script src="/radar.js?v=3"></script>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -55,8 +55,8 @@
   @media (max-width: 820px) { .stage { grid-template-columns:1fr; padding:18px } }
 
   .polaroid { background:#fff; padding:12px 12px 0; border-radius:6px; box-shadow:0 18px 40px #0006, 0 2px 0 #fff8 inset;
-              transform:rotate(-2.5deg); transition:transform .5s; position:relative; color:#222; max-width:420px; width:100%; justify-self:center }
-  .polaroid:hover { transform:rotate(0) scale(1.02) }
+              transition:transform .5s; position:relative; color:#222; max-width:420px; width:100%; justify-self:center }
+  .polaroid:hover { transform:scale(1.015) }
   .polaroid img { width:100%; aspect-ratio:4/3; object-fit:cover; display:block; background:#111; border-radius:2px }
   .polaroid .cap { font:700 22px/1 "Marker Felt","Bradley Hand","Segoe Print",cursive; padding:14px 6px 16px; display:flex; justify-content:space-between; gap:8px }
   .polaroid .cap span:last-child { opacity:.55; font-size:17px; align-self:center }
@@ -144,7 +144,7 @@
 <main>
   <header>
     <img src="/logo.svg" alt="" class="logo"><h1>on-duty</h1><span class="pill" id="pill">…</span><span class="sp"></span>
-    <button id="blur" data-i="blur"></button><button id="test" data-i="test"></button>
+    <span class="menuwrap"><button id="camBtn" data-i="cam_menu"></button><div class="menu" id="cmenu"><button id="mirror"></button><button id="blur"></button><button id="level"></button><button id="unlevel" data-i="unlevel"></button></div></span><button id="test" data-i="test"></button>
     <span class="menuwrap"><button id="pause"></button><div class="menu" id="pmenu"><button data-m="60" data-i="p1h"></button><button data-m="tomorrow" data-i="ptom"></button></div></span>
     <a href="/setup?edit" class="gear" title="Settings" aria-label="Settings">⚙</a><button id="photo" data-i="photo"></button>
   </header>
@@ -234,6 +234,7 @@ const STR = {
     cal_never:'Ainda não calibrei com você. Leva 40 s e acerta bastante.', cal_new:'Setup novo detectado (tela ou câmera diferente). Recalibrar?', cal_drift:'Parece que sua postura, a câmera ou o notebook mudou de lugar. Recalibrar?', cal_go:'📐 Calibrar',
     hl_dark:'Está escuro: não consigo te ver direito.', hl_blocked:'Quase não te vejo enquanto você digita: câmera tapada ou fora de posição?',
     fb_no:'🙅 Não estava no celular', fb_miss:'📱 Você deixou passar', fb_no_t:'Anotado: fico mais relaxado.', fb_miss_t:'Anotado: fico mais rigoroso.', radar_hint:'Você é o ponto. A faixa vermelha é onde eu daria bronca; as manchas verdes são os lugares onde você trabalha.', tuned:t=>`ajuste fino: cabeça ${t.pitch >= 0 ? '+' : ''}${t.pitch}° · olhar ${t.gaze >= 0 ? '+' : ''}${t.gaze}`,
+    cam_menu:'🎥 Câmera', mirror:'↔ Espelhar', unmirror:'↔ Sem espelho', level:'📐 Endireitar (sente reto)', leveling:'Medindo… sente reto', unlevel:'↺ Zerar inclinação', lv_ok:'Câmera endireitada.', lv_no:'Não vi seu rosto: nada mudou.',
     pause:'⏸ Pausar', resume:'▶ Retomar', p1h:'Por 1 hora', ptom:'Até amanhã', blur:'Borrar câmera', unblur:'Mostrar câmera', test:'Testar alerta', photo:'📸 Tirar foto', download:'Baixar', copy:'Copiar', share:'Compartilhar', close:'Fechar',
     head:'Cabeça vs. seu normal', gaze:'Olhar pra baixo vs. normal', downwin:'Olhando pra baixo (janela)', idlelbl:'Sem teclado/mouse', phonelbl:'Celular na câmera (YOLO)',
     lg_head:'cabeça (°)', lg_gaze:'olhar ×40', lg_down:'pra baixo', lg_phone:'celular visto', signals:'Sinais e detalhes', events:'Eventos',
@@ -257,6 +258,7 @@ const STR = {
     cal_never:'I haven’t calibrated to you yet. It takes 40 s and makes a big difference.', cal_new:'New setup detected (different screen or camera). Recalibrate?', cal_drift:'Your posture, camera or laptop seems to have moved. Recalibrate?', cal_go:'📐 Calibrate',
     hl_dark:'It’s dark: I can’t see you well.', hl_blocked:'I barely see you while you type: camera covered or out of position?',
     fb_no:'🙅 I wasn’t on my phone', fb_miss:'📱 You missed one', fb_no_t:'Noted: I’ll be more relaxed.', fb_miss_t:'Noted: I’ll be stricter.', radar_hint:'You’re the dot. The red band is where I’d nag; the green blobs are where you work.', tuned:t=>`fine-tuning: head ${t.pitch >= 0 ? '+' : ''}${t.pitch}° · gaze ${t.gaze >= 0 ? '+' : ''}${t.gaze}`,
+    cam_menu:'🎥 Camera', mirror:'↔ Mirror', unmirror:'↔ No mirror', level:'📐 Straighten (sit upright)', leveling:'Measuring… sit upright', unlevel:'↺ Reset tilt', lv_ok:'Camera straightened.', lv_no:'I couldn’t see your face: nothing changed.',
     pause:'⏸ Pause', resume:'▶ Resume', p1h:'For 1 hour', ptom:'Until tomorrow', blur:'Blur camera', unblur:'Show camera', test:'Test alert', photo:'📸 Snap', download:'Download', copy:'Copy', share:'Share', close:'Close',
     head:'Head vs. your normal', gaze:'Looking down vs. normal', downwin:'Looking down (window)', idlelbl:'No keyboard/mouse', phonelbl:'Phone in camera (YOLO)',
     lg_head:'head (°)', lg_gaze:'gaze ×40', lg_down:'looking down', lg_phone:'phone seen', signals:'Signals & details', events:'Events',
@@ -289,13 +291,17 @@ const clockFmt = ms => { const s = Math.max(0, Math.floor(ms / 1000)), h = Math.
   return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(ss).padStart(2, '0'); };
 
 $('test').onclick = () => fetch('/test', {method:'POST'});
-$('blur').onclick = () => fetch('/blur', {method:'POST'});
+$('blur').onclick = () => { fetch('/blur', {method:'POST'}); $('cmenu').classList.remove('on'); };
+$('camBtn').onclick = () => $('cmenu').classList.toggle('on');
+$('level').onclick = () => { fetch('/api/level', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'}); $('cmenu').classList.remove('on'); };
+$('unlevel').onclick = () => { fetch('/api/config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({rotate:0})}); $('cmenu').classList.remove('on'); };
+$('mirror').onclick = async () => { const on = !(await (await fetch('/status')).json()).mirror; await fetch('/api/config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({mirror:on})}); $('cmenu').classList.remove('on'); };
 const feedback = async kind => { await post('/api/feedback', {kind}); toast(kind === 'missed' ? L.fb_miss_t : L.fb_no_t); };
 $('fbNo').onclick = () => feedback('false_positive'); $('fbMiss').onclick = () => feedback('missed');
 const post = (path, body) => fetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body || {})});
 $('pause').onclick = () => { if ($('pause').dataset.paused) post('/api/pause', {minutes:0}); else $('pmenu').classList.toggle('on'); };
 document.querySelectorAll('#pmenu button').forEach(b => b.onclick = () => { post('/api/pause', {minutes:b.dataset.m === 'tomorrow' ? 'tomorrow' : +b.dataset.m}); $('pmenu').classList.remove('on'); });
-addEventListener('click', e => { if (!e.target.closest('.menuwrap')) $('pmenu').classList.remove('on'); });
+addEventListener('click', e => { if (!e.target.closest('.menuwrap')) { $('pmenu').classList.remove('on'); $('cmenu').classList.remove('on'); } });
 
 /* ---------- toast + fx ---------- */
 let toastT;
@@ -374,7 +380,7 @@ function onSaid(s) {
   if (!first && d.kind !== 'back' && d.level >= 4) { $('photo').classList.add('hot'); toast(L.toast_photo); }
 }
 
-let bannerOff = false, radar = null;
+let bannerOff = false, radar = null, lastLevelNote = null;
 function banner(s) {
   const c = s.calibration || {}, h = (s.health || [])[0];
   const msg = h ? L['hl_' + h] : s.mode !== 'active' || !s.onboarded ? '' : c.state === 'never' ? L.cal_never : c.state === 'new_setup' ? L.cal_new : c.state === 'drift' ? L.cal_drift : '';
@@ -386,7 +392,8 @@ async function tick() {
   try {
     const s = await (await fetch('/status' + ($('sig').open ? '?series=1' : ''))).json();
     const c = s.cfg || {}; NAME = s.name || ''; setLang(s.lang);
-    $('blur').textContent = s.blur ? L.unblur : L.blur;
+    $('blur').textContent = s.blur ? L.unblur : L.blur; $('mirror').textContent = s.mirror ? L.unmirror : L.mirror; $('level').textContent = s.level ? L.leveling : L.level; $('unlevel').style.display = s.rotate ? '' : 'none';
+    if (s.level_note && s.level_note.t !== lastLevelNote) { if (lastLevelNote !== null) toast(s.level_note.ok ? L.lv_ok : L.lv_no); lastLevelNote = s.level_note.t; } else if (lastLevelNote === null) lastLevelNote = s.level_note ? s.level_note.t : 0;
     const now = Date.now(), demo = !s.scrolling && s.said && s.said.kind === 'test' && now / 1000 - s.said.t < 9;
     const lvl = demo ? s.said.level : s.scrolling ? Math.max(1, s.level) : 0;
     let key, pal, st, stamp, stampc, idle;
@@ -525,7 +532,7 @@ async function drawCard(m) {
   if (lv) { g.font = '800 30px "Avenir Next",system-ui'; g.fillStyle = '#0006'; g.beginPath(); g.roundRect(W - 64 - pw, 64, pw, 56, 28); g.fill();
     g.fillStyle = '#fff'; g.fillText(lv.toUpperCase(), W - 64 - pw + 22, 102); }
   // polaroid
-  g.save(); g.translate(W / 2, 510); g.rotate(-.04); g.scale(.9, .9);
+  g.save(); g.translate(W / 2, 510); g.rotate(-.022); g.scale(.9, .9);
   g.shadowColor = '#0007'; g.shadowBlur = 50; g.shadowOffsetY = 26; g.fillStyle = '#fff'; g.fillRect(-350, -400, 700, 800); g.shadowColor = 'transparent';
   const ix = -318, iy = -368, iw = 636, ih = 560; g.fillStyle = '#111'; g.fillRect(ix, iy, iw, ih);
   g.save(); g.beginPath(); g.rect(ix, iy, iw, ih); g.clip();

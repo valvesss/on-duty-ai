@@ -27,6 +27,8 @@ DEFAULTS = {
     "port": 4269,             # dashboard at http://localhost:<port>
     "retention_days": 365,    # events older than this are deleted at startup (0 = keep forever)
     "camera": 0,
+    "rotate": 0.0,            # degrees (counter-clockwise) to straighten a tilted camera; `Level` in the dashboard measures it
+    "mirror": True,           # preview like a selfie mirror (detection always uses the raw image)
     "phone_detection": True,  # YOLO11n "cell phone" detector (Apple Silicon recommended)
     "custom_phrases_only": False,  # true = use only ~/.on-duty/phrases.json, false = mix with built-ins
     "schedule": {

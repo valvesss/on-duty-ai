@@ -94,6 +94,8 @@ def validate_config(new: dict) -> dict:
     sch["days"] = sorted({int(d) for d in sch["days"] if 1 <= int(d) <= 7})
     cfg["port"] = CFG["port"]  # needs a restart; not editable from the page
     cfg["camera"] = max(0, min(9, int(cfg["camera"])))
+    cfg["mirror"] = bool(cfg["mirror"])
+    cfg["rotate"] = round(max(-25.0, min(25.0, float(cfg["rotate"]))), 1)
     return cfg
 
 
@@ -194,7 +196,7 @@ CAM = Camera()
 STATE["boxes"] = []
 
 
-def encode_preview(frame, boxes, blur: bool) -> bytes:
+def encode_preview(frame, boxes, blur: bool, mirror: bool = True, rotate: float = 0.0) -> bytes:
     """480 px wide JPEG for the dashboard: phone boxes drawn on, or heavily pixelated when blur is on."""
     h, w = frame.shape[:2]
     small = cv2.resize(frame, (480, int(480 * h / w)))
@@ -202,9 +204,20 @@ def encode_preview(frame, boxes, blur: bool) -> bytes:
         sh, sw = small.shape[:2]
         small = cv2.resize(cv2.GaussianBlur(cv2.resize(small, (24, 18), interpolation=cv2.INTER_AREA), (0, 0), 2), (sw, sh), interpolation=cv2.INTER_CUBIC)
     k = 480 / w
-    for x1, y1, x2, y2 in boxes:
+    for x1, y1, x2, y2 in boxes:  # boxes are in raw coordinates; draw them before flipping so the label text stays readable
         cv2.rectangle(small, (int(x1 * k), int(y1 * k)), (int(x2 * k), int(y2 * k)), (94, 63, 244), 3)
-        cv2.putText(small, "phone", (int(x1 * k), max(18, int(y1 * k) - 6)), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (94, 63, 244), 2)
+    if mirror:
+        small = cv2.flip(small, 1)
+        for x1, y1, x2, y2 in boxes:
+            cv2.putText(small, "phone", (480 - int(x2 * k), max(18, int(y1 * k) - 6)), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (94, 63, 244), 2)
+    else:
+        for x1, y1, x2, y2 in boxes:
+            cv2.putText(small, "phone", (int(x1 * k), max(18, int(y1 * k) - 6)), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (94, 63, 244), 2)
+    if rotate:  # straighten a tilted camera; zoom just enough to hide the empty corners
+        sh, sw = small.shape[:2]
+        t = np.radians(abs(rotate))
+        m = cv2.getRotationMatrix2D((sw / 2, sh / 2), rotate, np.cos(t) + np.sin(t) * sw / sh)
+        small = cv2.warpAffine(small, m, (sw, sh), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
     return cv2.imencode(".jpg", small, [cv2.IMWRITE_JPEG_QUALITY, 72])[1].tobytes()
 
 
@@ -237,7 +250,7 @@ class Dashboard(BaseHTTPRequestHandler):
             self._send(db.history_ndjson(), "application/x-ndjson")
         elif path == "/frame.jpg":
             frame, _ = CAM.wait(-1, 0)
-            self._send(encode_preview(frame, STATE["boxes"], STATE["blur"]) if frame is not None else BLANK, "image/jpeg")
+            self._send(encode_preview(frame, STATE["boxes"], STATE["blur"], CFG["mirror"], CFG["rotate"]) if frame is not None else BLANK, "image/jpeg")
         elif path == "/stream.mjpg":  # smooth live preview: multipart JPEG, ~20 fps
             self.send_response(200)
             self.send_header("Content-Type", "multipart/x-mixed-replace; boundary=frame")
@@ -249,7 +262,7 @@ class Dashboard(BaseHTTPRequestHandler):
                     frame, seq = CAM.wait(seq, 1.0)
                     time.sleep(max(0.0, 0.05 - (time.time() - last)))
                     frame, seq = CAM.wait(seq - 1, 0)  # freshest frame after the throttle sleep
-                    jpg = encode_preview(frame, STATE["boxes"], STATE["blur"]) if frame is not None else BLANK
+                    jpg = encode_preview(frame, STATE["boxes"], STATE["blur"], CFG["mirror"], CFG["rotate"]) if frame is not None else BLANK
                     self.wfile.write(b"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\n\r\n" % len(jpg) + jpg + b"\r\n")
                     last = time.time()
                     if frame is None:
@@ -299,6 +312,8 @@ class Dashboard(BaseHTTPRequestHandler):
                 STATE["pause_until"] = time.time() + float(m) * 60 if float(m) > 0 else 0
         elif self.path == "/api/feedback":  # {"kind": "false_positive" | "missed"}
             STATE["cmds"].append({"action": "feedback", "kind": body.get("kind", "false_positive")})
+        elif self.path == "/api/level":  # measure the camera tilt from your eye line (sit upright for 3 s)
+            STATE["cmds"].append({"action": "level"})
         elif self.path == "/api/calibrate":  # start | finish | cancel | reset | discard — handled by the engine loop
             STATE["cmds"].append(body)
         elif self.path == "/api/say":  # voice preview in the setup wizard
@@ -408,7 +423,7 @@ class Nagger:
         return self.say(self._pick(tier, self.back[tier]), 0, minutes, kind="back")
 
 
-Pose = collections.namedtuple("Pose", "pitch yaw gaze face_h cx")
+Pose = collections.namedtuple("Pose", "pitch yaw gaze face_h cx roll")
 
 
 def head_pose(lm: vision.FaceLandmarker, frame) -> Pose | None:
@@ -421,7 +436,10 @@ def head_pose(lm: vision.FaceLandmarker, frame) -> Pose | None:
     yaw = float(np.degrees(np.arctan2(-R[2, 0], np.hypot(R[2, 1], R[2, 2]))))
     bs = {c.category_name: c.score for c in r.face_blendshapes[0]}
     xs, ys = [p.x for p in r.face_landmarks[0]], [p.y for p in r.face_landmarks[0]]
-    return Pose(pitch, yaw, (bs["eyeLookDownLeft"] + bs["eyeLookDownRight"]) / 2, max(ys) - min(ys), (max(xs) + min(xs)) / 2)
+    a, b = sorted((r.face_landmarks[0][33], r.face_landmarks[0][263]), key=lambda p: p.x)  # outer eye corners, left→right in the image
+    h, w = frame.shape[:2]
+    roll = float(np.degrees(np.arctan2((b.y - a.y) * h, (b.x - a.x) * w)))  # image tilt of the eye line, clockwise positive
+    return Pose(pitch, yaw, (bs["eyeLookDownLeft"] + bs["eyeLookDownRight"]) / 2, max(ys) - min(ys), (max(xs) + min(xs)) / 2, roll)
 
 
 def load_yolo(cfg: dict):
@@ -460,6 +478,7 @@ def main() -> None:
         output_face_blendshapes=True, output_facial_transformation_matrixes=True, num_faces=1))
     yolo = load_yolo(CFG)
     smoother = calibration.Smoother(3)
+    level_ses: dict | None = None  # auto-level: median eye-line tilt over 3 s
 
     hist: collections.deque[bool] = collections.deque(maxlen=max(1, int(th["window"] * a.fps)))
     phone_hist: collections.deque[bool] = collections.deque(maxlen=hist.maxlen)
@@ -500,7 +519,7 @@ def main() -> None:
         STATE["status"] = {**STATE["status"], "t": int(now), "mode": m, "mode_why": why, "name": CFG["name"], "lang": CFG["lang"],
                            "onboarded": CFG["onboarded"], "scrolling": False, "level": 0, "nags": 0, "phone_min": 0,
                            "resume_at": STATE["pause_until"] and int(STATE["pause_until"]) or (next_on(dt.datetime.now()) if m == "offduty" else 0),
-                           "blur": STATE["blur"], "said": STATE["said"]}
+                           "blur": STATE["blur"], "said": STATE["said"], "mirror": CFG["mirror"]}
 
     try:
         while True:
@@ -544,6 +563,8 @@ def main() -> None:
                         streak_start, n_nags, grace_until = None, 0, t0 + 60
                     th = eff_th()
                     log(f"feedback {kind}: tuning now {tuning} → pitch_delta {th['pitch_delta']}, gaze_delta {th['gaze_delta']}")
+                elif act == "level" and mode == "active" and CAM.is_open:
+                    level_ses = {"t0": t0, "vals": []}
                 elif act == "unphone":
                     cal["phone"] = None
                 elif act == "reset" and setup["sig"]:
@@ -740,6 +761,19 @@ def main() -> None:
                     f"gaze={gaze if gaze is None else round(gaze, 2)} base={base if base is None else round(base, 1)} "
                     f"phone={'y' if phone_boxes else 'n'} down={ratio:.0%} idle={idle:.0f}s")
 
+            if level_ses:
+                if pose:
+                    level_ses["vals"].append(-pose.roll if CFG["mirror"] else pose.roll)  # tilt as the viewer sees it
+                if now - level_ses["t0"] >= 3:
+                    vals = level_ses["vals"]
+                    if len(vals) >= 4:
+                        CFG["rotate"] = round(max(-25.0, min(25.0, statistics.median(vals))), 1)
+                        config.save(CFG)
+                        log(f"auto-level: rotate {CFG['rotate']}° from {len(vals)} samples")
+                    else:
+                        log("auto-level: no face seen, nothing changed")
+                    STATE["level_note"] = {"t": int(now), "ok": len(vals) >= 4}
+                    level_ses = None
             cal_live = None
             if cap_ses:
                 cap_ses.add((pose.pitch, pose.yaw, pose.gaze) if pose else None, bright, pose.face_h if pose else 0.0, pose.cx if pose else 0.5, phone=bool(phone_boxes))
@@ -760,7 +794,7 @@ def main() -> None:
                                 "created": setup["created"], "thresholds": overrides, "camera": CFG["camera"]},
                 "cal": {"open": calibrating, "live": cal_live, "zones": cal["zones"], "phone": cal["phone"], "last": cal["last"]},
                 "pose": ({"pitch": round(ps.pitch, 1), "yaw": round(ps.yaw, 1), "gaze": round(ps.gaze, 2), "base": round(base, 1) if base is not None else None} if ps else None),
-                "health": health, "camera_note": STATE.get("camera_note", 0),
+                "health": health, "camera_note": STATE.get("camera_note", 0), "level_note": STATE.get("level_note"),
                 "t": int(now), "mode": "active", "mode_why": "", "resume_at": 0, "camera_ok": True, "onboarded": CFG["onboarded"],
                 "name": CFG["name"], "lang": CFG["lang"], "face": bool(pose),
                 "dpitch": dpitch, "gaze": gaze, "gaze_base": gbase, "down": down, "face_down": face_down,
@@ -769,7 +803,8 @@ def main() -> None:
                 "idle": round(idle), "scrolling": bool(streak_start), "level": nag.level(n_nags) + 1 if n_nags else 0,
                 "nags": n_nags, "calibrated": base is not None, "work_samples": len(work_pitch),
                 "phone_min": round((now - streak_start) / 60, 1) if streak_start else 0, "cfg": th,
-                "blur": STATE["blur"], "said": STATE["said"],
+                "blur": STATE["blur"], "said": STATE["said"], "mirror": CFG["mirror"], "rotate": CFG["rotate"],
+                "level": level_ses and {"progress": min(1.0, (now - level_ses["t0"]) / 3)},
             }
             STATE["series"].append([int(now), dpitch, gaze - gbase if gaze is not None else None, down,
                                     idle >= th["idle"], bool(phone_boxes)])

@@ -1,4 +1,5 @@
-/* Head-pose radar shared by the dashboard and the setup wizard.
+/* Yaw is positive when the nose points to the right of the RAW image; the preview is mirrored by default, so x flips with it.
+ * Head-pose radar shared by the dashboard and the setup wizard.
  *   const r = Radar(canvas); r.set(status)   // call with each /status payload; it animates itself
  * x = head yaw (turn), y = head pitch (down is down). Zones are where you work; the red band is where I'd nag. */
 function Radar(canvas, opts = {}) {
@@ -12,7 +13,7 @@ function Radar(canvas, opts = {}) {
   function frame() {
     if (!canvas.isConnected) return;
     raf = requestAnimationFrame(frame);
-    const s = st, pose = s && s.pose, cal = (s && s.calibration) || {}, th = (s && s.cfg) || {};
+    const s = st, flip = s && s.mirror ? -1 : 1, pose = s && s.pose, cal = (s && s.calibration) || {}, th = (s && s.cfg) || {};
     const zones = (s && s.cal && s.cal.open && s.cal.zones.length ? s.cal.zones : cal.zone_data) || [], phone = s && s.cal && s.cal.phone;
     g.clearRect(0, 0, W, H);
     g.fillStyle = '#0f172a'; g.beginPath(); g.roundRect(0, 0, W, H, 22 * dpr); g.fill();
@@ -24,17 +25,17 @@ function Radar(canvas, opts = {}) {
     // alert area under each zone
     const pd = th.pitch_delta || 12;
     for (const z of zones) {
-      const top = py(z.pitch + pd), x0 = px(z.yaw - 25), x1 = px(z.yaw + 25);
+      const zy = z.yaw * flip, top = py(z.pitch + pd), x0 = px(zy - 25), x1 = px(zy + 25);
       const grd = g.createLinearGradient(0, top, 0, H); grd.addColorStop(0, '#ef444455'); grd.addColorStop(1, '#ef444411');
       g.fillStyle = grd; g.fillRect(x0, top, x1 - x0, H - top);
       g.setLineDash([6 * dpr, 5 * dpr]); g.strokeStyle = '#f87171'; g.lineWidth = 2 * dpr; g.beginPath(); g.moveTo(x0, top); g.lineTo(x1, top); g.stroke(); g.setLineDash([]);
-      g.fillStyle = '#22c55e33'; g.strokeStyle = '#22c55e'; g.lineWidth = 2 * dpr; g.beginPath(); g.ellipse(px(z.yaw), py(z.pitch), 38 * dpr, 30 * dpr, 0, 0, 7); g.fill(); g.stroke();
-      g.fillStyle = '#bbf7d0'; g.font = `700 ${12 * dpr}px system-ui`; g.textAlign = 'center'; g.fillText(z.name, px(z.yaw), py(z.pitch) - 38 * dpr);
+      g.fillStyle = '#22c55e33'; g.strokeStyle = '#22c55e'; g.lineWidth = 2 * dpr; g.beginPath(); g.ellipse(px(zy), py(z.pitch), 38 * dpr, 30 * dpr, 0, 0, 7); g.fill(); g.stroke();
+      g.fillStyle = '#bbf7d0'; g.font = `700 ${12 * dpr}px system-ui`; g.textAlign = 'center'; g.fillText(z.name, px(zy), py(z.pitch) - 38 * dpr);
     }
-    if (phone) { g.font = `${22 * dpr}px system-ui`; g.textAlign = 'center'; g.fillText('📱', px(phone.yaw), py(phone.pitch) + 8 * dpr); }
+    if (phone) { g.font = `${22 * dpr}px system-ui`; g.textAlign = 'center'; g.fillText('📱', px(phone.yaw * flip), py(phone.pitch) + 8 * dpr); }
     // you
     if (pose) {
-      const tx = px(pose.yaw), ty = py(pose.pitch);
+      const tx = px(pose.yaw * flip), ty = py(pose.pitch);
       dot = dot ? { x: lerp(dot.x, tx, .28), y: lerp(dot.y, ty, .28) } : { x: tx, y: ty };
       trail.push({ ...dot }); if (trail.length > 28) trail.shift();
       const hot = s.down || s.phone;

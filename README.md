@@ -93,7 +93,7 @@ The dashboard shows each state (and when it's back) instead of going blank.
 Open <http://localhost:4269> and keep it on a second monitor.
 
 - **Live speech bubble** — each line appears as it's spoken.
-- **Smooth live camera** (~20 fps; detection runs separately at its own pace) in a polaroid, with a blur button, a stamp and a running clock.
+- **Smooth live camera** (~20 fps; detection runs separately at its own pace) in a straight polaroid, mirrored like a selfie view, with a stamp and a running clock. The **🎥 Camera** menu has *Mirror*, *Blur*, and **Straighten** — sit upright for 3 seconds and it measures your camera's tilt from your eye line and levels the picture.
 - **📸 Snap** — builds the shareable card; download, copy, or share. Level 4–5 lines make the button pulse: those are the ones worth posting.
 - **Hall of shame** — today's heaviest lines, one tap each from becoming a card.
 - History charts, focus streak, and a collapsible panel with the raw signals and the live head-pose radar.
@@ -163,6 +163,8 @@ Everything lives in `~/.on-duty/config.json` and is editable from the wizard.
 | `voice` / `voice_on` | default / `true` | Any macOS voice; off = notifications and dashboard only |
 | `schedule` | Mon–Fri 09:00–18:00, break 12:00–13:30 | `"enforce": false` = always on |
 | `camera` | `0` | Camera index (the wizard's *Switch camera* button changes it) |
+| `mirror` | `true` | Selfie-style preview (detection always uses the raw image) |
+| `rotate` | `0` | Degrees to straighten a tilted camera (set by *Straighten*) |
 | `phone_detection` | `true` | The YOLO phone detector |
 | `retention_days` | `365` | Events older than this are deleted at startup (`0` = keep forever) |
 | `port` | `4269` | Dashboard at `http://localhost:<port>` (restart after changing) |
