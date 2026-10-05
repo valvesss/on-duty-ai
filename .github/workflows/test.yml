@@ -1,8 +1,17 @@
 name: tests
 on: [push, pull_request]
 jobs:
-  test:
-    runs-on: macos-latest   # the only supported platform for now; add ubuntu/windows here when a port lands
+  pure-logic:   # stdlib only, runs anywhere in seconds: calibration math, detection rules, focus, weekly stats
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: python -m unittest tests.test_calibration tests.test_logic tests.test_stats -v
+
+  macos:        # the full suite incl. the HTTP API tests and the macOS osal; add ubuntu/windows here when a port lands
+    runs-on: macos-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
