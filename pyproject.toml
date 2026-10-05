@@ -1,6 +1,6 @@
 [project]
 name = "on-duty-ai"
-version = "0.3.0"
+version = "0.4.0"
 description = "Your webcam notices when you leave work for your phone, and talks you back."
 license = { text = "MIT" }
 requires-python = ">=3.12,<3.13"

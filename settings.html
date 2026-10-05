@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>on-duty · settings</title>
+<script src="/radar.js?v=3"></script>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<style>
+  :root { --bg:#f4f3ef; --card:#fff; --fg:#1b1b1a; --mute:#77756f; --line:#e4e2dc; --acc:#2563eb; --ok:#16a34a; --warn:#d97706; --bad:#dc2626;
+          --c1:#0f766e; --c2:#2563eb; --font:"Avenir Next","SF Pro Rounded",ui-rounded,system-ui,sans-serif; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0e0e0d; --card:#1a1a18; --fg:#ecebe6; --mute:#9a988f; --line:#2c2b28; } }
+  * { box-sizing:border-box }
+  html { scroll-behavior:smooth; scroll-padding-top:84px }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.45 var(--font) }
+  a { color:inherit }
+  header { position:sticky; top:0; z-index:20; background:color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter:blur(10px); border-bottom:1px solid var(--line) }
+  .bar { max-width:1060px; margin:0 auto; padding:12px 18px; display:flex; align-items:center; gap:12px }
+  .bar img { width:32px; height:32px } .bar h1 { margin:0; font-size:19px; letter-spacing:-.02em }
+  .bar .sp { flex:1 }
+  .saved { font-weight:700; font-size:13px; color:var(--ok); opacity:0; transition:opacity .3s } .saved.on { opacity:1 }
+  .btn { font:inherit; font-weight:700; border:1px solid var(--line); background:var(--card); color:var(--fg); border-radius:99px; padding:8px 16px; cursor:pointer; text-decoration:none; display:inline-block; transition:transform .12s, box-shadow .12s }
+  .btn:hover { transform:translateY(-1px); box-shadow:0 4px 14px #0002 }
+  .btn.main { background:linear-gradient(135deg,var(--c1),var(--c2)); color:#fff; border:0 }
+  .btn.big { padding:14px 26px; font-size:17px }
+  .btn.danger { color:var(--bad); border-color:color-mix(in srgb, var(--bad) 40%, var(--line)) }
+  .btn.sm { padding:5px 12px; font-size:13px }
+  main { max-width:1060px; margin:0 auto; padding:22px 18px 80px; display:grid; grid-template-columns:200px 1fr; gap:28px }
+  nav { position:sticky; top:84px; align-self:start; display:grid; gap:2px }
+  nav a { text-decoration:none; padding:9px 12px; border-radius:12px; font-weight:600; color:var(--mute); display:flex; gap:10px; align-items:center }
+  nav a:hover { background:var(--card) } nav a.on { background:var(--card); color:var(--fg); box-shadow:inset 3px 0 0 var(--acc) }
+  nav a .dot { width:8px; height:8px; border-radius:50%; background:var(--warn); margin-left:auto; display:none } nav a.need .dot { display:block }
+  @media (max-width: 820px) { main { grid-template-columns:1fr } nav { position:static; display:flex; overflow-x:auto; gap:6px; padding-bottom:6px } nav a { white-space:nowrap; background:var(--card) } }
+  section { background:var(--card); border:1px solid var(--line); border-radius:20px; padding:22px; margin-bottom:18px }
+  section h2 { margin:0 0 4px; font-size:20px; letter-spacing:-.02em; display:flex; align-items:center; gap:10px }
+  section > p.lede { margin:0 0 18px; color:var(--mute) }
+  .field { margin:16px 0 } .field > label { display:block; font-weight:700; font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:var(--mute); margin-bottom:8px }
+  input[type=text], input[type=time], select { font:inherit; font-weight:600; color:var(--fg); background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:10px 14px; outline:none; min-width:0 }
+  input[type=text] { width:100%; max-width:340px } input:focus, select:focus { border-color:var(--acc); box-shadow:0 0 0 3px color-mix(in srgb, var(--acc) 25%, transparent) }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center }
+  .seg { display:inline-flex; background:var(--bg); border:1px solid var(--line); border-radius:99px; padding:3px }
+  .seg button, .chip { font:inherit; font-weight:700; border:0; background:transparent; color:var(--mute); border-radius:99px; padding:7px 16px; cursor:pointer; transition:.2s }
+  .seg button.on { background:var(--fg); color:var(--bg) }
+  .chip { background:var(--bg); border:1px solid var(--line); color:var(--fg) } .chip.on { background:var(--fg); color:var(--bg); border-color:var(--fg) }
+  .switch { display:flex; align-items:center; gap:12px; cursor:pointer; user-select:none; font-weight:600; margin:10px 0 }
+  .switch i { width:46px; height:27px; border-radius:14px; background:var(--line); position:relative; transition:.25s; flex:none }
+  .switch i::after { content:""; position:absolute; top:3px; left:3px; width:21px; height:21px; border-radius:50%; background:#fff; transition:.25s; box-shadow:0 1px 3px #0004 }
+  .switch.on i { background:var(--ok) } .switch.on i::after { left:22px }
+  .switch small { display:block; font-weight:500; color:var(--mute) }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:12px }
+  .tcard { text-align:left; background:var(--bg); border:2px solid var(--line); border-radius:16px; padding:14px; cursor:pointer; font:inherit; color:var(--fg); transition:.2s }
+  .tcard:hover { transform:translateY(-2px) } .tcard.on { border-color:var(--acc); background:color-mix(in srgb, var(--acc) 8%, var(--bg)) }
+  .tcard .em { font-size:26px } .tcard b { display:block; font-size:17px } .tcard small { display:block; color:var(--mute) } .tcard q { display:block; margin-top:8px; font-style:normal; font-weight:700; font-size:13px }
+  .hint { color:var(--mute); font-size:13px }
+  .grid2 { display:grid; grid-template-columns:minmax(260px,360px) 1fr; gap:22px; align-items:start } @media (max-width:820px) { .grid2 { grid-template-columns:1fr } }
+  .cam { border-radius:16px; overflow:hidden; background:#000; aspect-ratio:4/3; position:relative } .cam img { width:100%; height:100%; object-fit:cover; display:block }
+  input[type=range] { width:100%; max-width:300px; accent-color:var(--acc) }
+  .stat { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin:14px 0 }
+  .stat div { background:var(--bg); border:1px solid var(--line); border-radius:14px; padding:10px 12px } .stat b { display:block; font-size:21px; letter-spacing:-.02em } .stat span { font-size:12px; color:var(--mute) }
+  .badge { font-size:12px; font-weight:800; padding:3px 10px; border-radius:99px; color:#fff; text-transform:uppercase; letter-spacing:.04em; background:var(--mute) }
+  .badge.ok { background:var(--ok) } .badge.warn { background:var(--warn) } .badge.bad { background:var(--bad) }
+  .list { display:grid; gap:8px; margin-top:10px } .item { display:flex; gap:12px; align-items:center; background:var(--bg); border:1px solid var(--line); border-radius:14px; padding:10px 14px } .item .sp { flex:1 } .item small { color:var(--mute); display:block }
+  .callout { display:flex; gap:16px; align-items:center; flex-wrap:wrap; background:linear-gradient(135deg,color-mix(in srgb,var(--c1) 14%,var(--card)),color-mix(in srgb,var(--c2) 14%,var(--card))); border:1px solid color-mix(in srgb,var(--c2) 30%,var(--line)); border-radius:18px; padding:18px 20px; margin:14px 0 }
+  .callout.need { border-color:var(--warn); background:color-mix(in srgb,var(--warn) 12%,var(--card)) } .callout .sp { flex:1; min-width:200px } .callout b { font-size:17px }
+  code, .mono { font:600 13px ui-monospace,"SF Mono",monospace; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:2px 7px; word-break:break-all }
+  .prompt { background:var(--bg); border:1px dashed var(--line); border-radius:14px; padding:12px 14px; font-weight:700; margin:10px 0 }
+  #toast { position:fixed; bottom:22px; left:50%; transform:translate(-50%,80px); background:#111; color:#fff; padding:10px 18px; border-radius:99px; font-weight:700; transition:.35s; z-index:90 } #toast.on { transform:translate(-50%,0) }
+</style>
+</head>
+<body>
+<header><div class="bar"><img src="/logo.svg" alt=""><h1 id="ttl"></h1><span class="sp"></span><span class="saved" id="saved"></span><a class="btn" href="/" id="back"></a></div></header>
+<main>
+  <nav id="nav"></nav>
+  <div id="content">
+
+  <section id="s-profile"><h2 id="h-profile"></h2><p class="lede" id="l-profile"></p>
+    <div class="field"><label id="lb-name"></label><input type="text" id="name" maxlength="40" autocomplete="off"></div>
+    <div class="field"><label id="lb-lang"></label><div class="seg" id="lang"><button data-v="pt_BR">🇧🇷 Português</button><button data-v="en_US">🇺🇸 English</button></div></div>
+  </section>
+
+  <section id="s-tone"><h2 id="h-tone"></h2><p class="lede" id="l-tone"></p>
+    <div class="cards" id="tones"></div>
+    <div class="switch" id="notifications"><i></i><div><span id="t-notif"></span><small id="t-notif-s"></small></div></div>
+    <div class="switch" id="sound_effects"><i></i><div><span id="t-sfx"></span><small id="t-sfx-s"></small></div></div>
+  </section>
+
+  <section id="s-schedule"><h2 id="h-schedule"></h2><p class="lede" id="l-schedule"></p>
+    <div class="seg" id="enforce"><button data-v="0" id="b-always"></button><button data-v="1" id="b-hours"></button></div>
+    <div id="sched">
+      <div class="field"><label id="lb-days"></label><div class="row" id="days"></div></div>
+      <div class="field row"><span id="t-from"></span><input type="time" id="st"><span id="t-to"></span><input type="time" id="en"></div>
+      <div class="switch" id="brk"><i></i><span id="t-brk"></span></div>
+      <div class="field row" id="brr"><span id="t-from2"></span><input type="time" id="b1"><span id="t-to2"></span><input type="time" id="b2"></div>
+    </div>
+    <p class="hint" id="sum"></p>
+  </section>
+
+  <section id="s-voice"><h2 id="h-voice"></h2><p class="lede" id="l-voice"></p>
+    <div class="switch" id="voice_on"><i></i><span id="t-voice-on"></span></div>
+    <div class="row" id="vrow"><select id="vs"></select><button class="btn" id="vp"></button></div>
+  </section>
+
+  <section id="s-camera"><h2 id="h-camera"></h2><p class="lede" id="l-camera"></p>
+    <div class="grid2">
+      <div><div class="cam"><img src="/stream.mjpg" alt="" id="cam"></div><p class="hint" id="camhealth" style="margin:8px 0 0"></p></div>
+      <div>
+        <div class="field"><label id="lb-cam"></label><div class="row"><b id="camidx" class="mono"></b><button class="btn sm" id="swc"></button></div><p class="hint" id="camnote" style="margin:6px 0 0"></p></div>
+        <div class="switch" id="mirror"><i></i><span id="t-mirror"></span></div>
+        <div class="field"><label id="lb-rot"></label><div class="row"><input type="range" id="rot" min="-15" max="15" step="0.5"><b id="rotv" class="mono"></b></div>
+          <div class="row" style="margin-top:8px"><button class="btn sm" id="lvl"></button><button class="btn sm" id="rot0"></button></div></div>
+        <div class="switch" id="phone_detection"><i></i><div><span id="t-phone"></span><small id="t-phone-s"></small></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="s-calibration"><h2 id="h-calibration"></h2><p class="lede" id="l-calibration"></p>
+    <div class="callout" id="calcall"><div class="sp"><b id="calttl"></b><div class="hint" id="calsub"></div></div><a class="btn main big" href="/setup?calibrate" id="calgo"></a></div>
+    <div class="grid2">
+      <div><canvas id="radar"></canvas></div>
+      <div>
+        <div class="stat" id="calstat"></div>
+        <div class="row"><button class="btn sm" id="rtune"></button><button class="btn sm danger" id="rcal"></button></div>
+        <p class="hint" id="tunehint"></p>
+      </div>
+    </div>
+    <div class="field"><label id="lb-setups"></label><div class="list" id="setups"></div><p class="hint" id="setupsnote"></p></div>
+  </section>
+
+  <section id="s-phrases"><h2 id="h-phrases"></h2><p class="lede" id="l-phrases"></p>
+    <div class="item"><div class="sp"><b id="phstate"></b><small id="phpath"></small></div><button class="btn sm danger" id="phrm"></button></div>
+    <div class="switch" id="custom_phrases_only" style="margin-top:14px"><i></i><span id="t-cpo"></span></div>
+    <div class="field"><label id="lb-ai"></label><div class="prompt" id="aip"></div><button class="btn sm" id="cpy"></button></div>
+  </section>
+
+  <section id="s-data"><h2 id="h-data"></h2><p class="lede" id="l-data"></p>
+    <div class="field"><label id="lb-ret"></label><select id="ret"></select></div>
+    <div class="row"><a class="btn" href="/api/export" download id="exp"></a><button class="btn danger" id="clr"></button></div>
+    <p class="hint" id="datainfo" style="margin-top:12px"></p>
+  </section>
+
+  <section id="s-about"><h2 id="h-about"></h2>
+    <div class="stat" id="aboutstat"></div>
+    <div class="row"><a class="btn" href="/setup?edit" id="rerun"></a><a class="btn" href="https://github.com/valvesss/on-duty-ai" target="_blank" rel="noopener">GitHub</a></div>
+    <p class="hint" id="aboutnote" style="margin-top:12px"></p>
+  </section>
+
+  </div>
+</main>
+<div id="toast"></div>
+<script>
+const $ = id => document.getElementById(id);
+const S = {
+  en: {
+    ttl:'Settings', back:'← Dashboard', saved:'Saved ✓', nav:{profile:'Profile',tone:'Humor & alerts',schedule:'Schedule',voice:'Voice',camera:'Camera & detection',calibration:'Calibration',phrases:'Phrases',data:'Data & privacy',about:'About'},
+    h_profile:'Profile', l_profile:'Who I’m talking to, and in which language.', lb_name:'Name', lb_lang:'Language of the voice and lines',
+    h_tone:'Humor & alerts', l_tone:'How hard I push. Tap a card to hear it.', notif:'Notifications', notif_s:'A macOS notification when I start and when I escalate.', sfx:'Alert sound', sfx_s:'The attention sound from level 3.',
+    tone:{friendly:['😇','Friendly','Gentle nudges, never above “firm”.'],balanced:['😏','Balanced','Starts polite, escalates every few lines.'],ruthless:['😈','Ruthless','Skips the politeness. Escalates fast.'],chaos:['🤪','Pure chaos','Straight to drama.']},
+    h_schedule:'Schedule', l_schedule:'Outside these hours I sleep: no nagging and the camera is off.', always:'Always on', hours:'Only during my work hours', lb_days:'Work days', from:'from', to:'to', brk:'Lunch / break',
+    days:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'], sum_always:'Always on. I only sleep when your screen does.', sum_hours:(d,a,b,br)=>`${d} · ${a}–${b}${br ? ' · break ' + br : ''}.`,
+    h_voice:'Voice', l_voice:'Uses your Mac’s built-in voices.', voice_on:'Speak out loud', listen:'▶ Listen',
+    h_camera:'Camera & detection', l_camera:'The picture is processed in memory and never saved.', lb_cam:'Camera', switch_cam:'📷 Switch camera', cam_idx:i=>`Camera ${i}`, cam_none:'No other camera found.', mirror:'Mirror the preview', lb_rot:'Straighten the picture', level:'📐 Auto-straighten (sit upright)', leveling:'Measuring…', rot0:'Reset', phone:'Detect phones with the camera', phone_s:'Needs Apple Silicon and some light.',
+    hl_dark:'It’s dark: I can’t see you well.', hl_blocked:'I barely see you while you type.', hl_ok:'Camera looks good.',
+    h_calibration:'Calibration', l_calibration:'Where you look while working, and how you look at your phone. Redo it when you move the laptop, plug a monitor, or switch cameras.',
+    cal_go:'📐 Calibrate now', cal_redo:'📐 Recalibrate', st:{ok:'Calibrated',never:'Not calibrated',new_setup:'New setup',drift:'Setup moved'},
+    cal_t:{ok:'Calibrated for this setup',never:'You haven’t calibrated yet',new_setup:'This is a new setup (screen or camera)',drift:'Your posture or camera seems to have moved'},
+    cal_s:{ok:l=>l||'', never:'It takes 40 seconds and noticeably reduces false alarms.', new_setup:'Calibrate it so I know where you look here.', drift:'Recalibrate to get precise again.'},
+    stat_zones:'Zones', stat_pd:'Head trigger', stat_gd:'Eye trigger', stat_noise:'Your jitter floor', stat_tune:'Fine-tuning', deg:'°', none:'none yet',
+    rtune:'Reset fine-tuning', rcal:'Forget this calibration', tunehint:'Fine-tuning comes from “I wasn’t on my phone” and “You missed one” in the dashboard.', confirm_rcal:'Forget the calibration for this setup?',
+    lb_setups:'Saved setups', setups_none:'No saved setups yet.', setups_active:'this one', setups_note:'Each combination of camera, number of displays and resolution has its own calibration; I switch automatically.', remove:'Remove',
+    h_phrases:'Phrases', l_phrases:'Built-in lines are always available; your AI assistant can add lines about you.', ph_none:'Built-in lines only', ph_custom:n=>`Custom pack: ${n} lines`, ph_rm:'Remove custom pack', cpo:'Use only my custom lines', lb_ai:'Personalize with your AI assistant', ai_prompt:'Personalize on-duty’s phrases for me.', copy:'Copy', copied:'Copied!',
+    h_data:'Data & privacy', l_data:'Everything stays on this Mac, in ~/.on-duty.', lb_ret:'Keep history for', ret:{30:'30 days',90:'90 days',180:'180 days',365:'1 year',0:'Forever'}, exp:'⬇ Export history', clr:'Delete all history', confirm_clr:'Delete all recorded history? This can’t be undone.', cleared:n=>`${n} events deleted.`,
+    datainfo:(n,db)=>`${n} events stored in ${db}`,
+    h_about:'About', ab_ver:'Version', ab_port:'Port', ab_events:'Events', rerun:'Run the setup wizard again', aboutnote:'Uninstall: ./onduty uninstall, then delete the folder and ~/.on-duty.'},
+  pt: {
+    ttl:'Configurações', back:'← Painel', saved:'Salvo ✓', nav:{profile:'Perfil',tone:'Humor e alertas',schedule:'Horário',voice:'Voz',camera:'Câmera e detecção',calibration:'Calibração',phrases:'Frases',data:'Dados e privacidade',about:'Sobre'},
+    h_profile:'Perfil', l_profile:'Com quem eu falo, e em que idioma.', lb_name:'Nome', lb_lang:'Idioma da voz e das frases',
+    h_tone:'Humor e alertas', l_tone:'Quão pesado eu sou. Toque num cartão pra ouvir.', notif:'Notificações', notif_s:'Uma notificação do macOS quando eu começo e quando escalo.', sfx:'Som de alerta', sfx_s:'O som de atenção a partir do nível 3.',
+    tone:{friendly:['😇','Gentil','Cutucadas leves, nunca passa de “cobrança”.'],balanced:['😏','Equilibrado','Começa educado e sobe a cada poucas falas.'],ruthless:['😈','Implacável','Pula a educação. Escala rápido.'],chaos:['🤪','Caos total','Direto pro drama.']},
+    h_schedule:'Horário', l_schedule:'Fora desse horário eu durmo: sem bronca e com a câmera desligada.', always:'Sempre ligado', hours:'Só no meu horário', lb_days:'Dias de trabalho', from:'das', to:'às', brk:'Almoço / pausa',
+    days:['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'], sum_always:'Sempre ligado. Só durmo quando a sua tela dorme.', sum_hours:(d,a,b,br)=>`${d} · ${a}–${b}${br ? ' · pausa ' + br : ''}.`,
+    h_voice:'Voz', l_voice:'Usa as vozes que já vêm no seu Mac.', voice_on:'Falar em voz alta', listen:'▶ Ouvir',
+    h_camera:'Câmera e detecção', l_camera:'A imagem é processada na memória e nunca é salva.', lb_cam:'Câmera', switch_cam:'📷 Trocar de câmera', cam_idx:i=>`Câmera ${i}`, cam_none:'Não achei outra câmera.', mirror:'Espelhar o preview', lb_rot:'Endireitar a imagem', level:'📐 Endireitar sozinho (sente reto)', leveling:'Medindo…', rot0:'Zerar', phone:'Detectar celular pela câmera', phone_s:'Precisa de Apple Silicon e um pouco de luz.',
+    hl_dark:'Está escuro: não consigo te ver direito.', hl_blocked:'Quase não te vejo enquanto você digita.', hl_ok:'A câmera está boa.',
+    h_calibration:'Calibração', l_calibration:'Onde você olha enquanto trabalha e como fica com o celular. Refaça ao mudar o notebook de lugar, plugar um monitor ou trocar de câmera.',
+    cal_go:'📐 Calibrar agora', cal_redo:'📐 Recalibrar', st:{ok:'Calibrado',never:'Sem calibração',new_setup:'Setup novo',drift:'Setup mudou'},
+    cal_t:{ok:'Calibrado para este setup',never:'Você ainda não calibrou',new_setup:'Este é um setup novo (tela ou câmera)',drift:'Sua postura ou a câmera parece ter mudado'},
+    cal_s:{ok:l=>l||'', never:'Leva 40 segundos e reduz bastante os alarmes falsos.', new_setup:'Calibre pra eu saber onde você olha aqui.', drift:'Recalibre pra voltar a ficar preciso.'},
+    stat_zones:'Zonas', stat_pd:'Gatilho da cabeça', stat_gd:'Gatilho do olhar', stat_noise:'Seu balanço natural', stat_tune:'Ajuste fino', deg:'°', none:'nenhuma ainda',
+    rtune:'Zerar ajuste fino', rcal:'Esquecer esta calibração', tunehint:'O ajuste fino vem de “Não estava no celular” e “Você deixou passar” no painel.', confirm_rcal:'Esquecer a calibração deste setup?',
+    lb_setups:'Setups salvos', setups_none:'Nenhum setup salvo ainda.', setups_active:'este', setups_note:'Cada combinação de câmera, número de telas e resolução tem a sua calibração; eu troco sozinho.', remove:'Remover',
+    h_phrases:'Frases', l_phrases:'As frases nativas sempre existem; seu assistente de IA pode somar frases sobre você.', ph_none:'Só frases nativas', ph_custom:n=>`Pacote próprio: ${n} frases`, ph_rm:'Remover pacote próprio', cpo:'Usar só as minhas frases', lb_ai:'Personalize com seu assistente de IA', ai_prompt:'Personalize as frases do on-duty pra mim.', copy:'Copiar', copied:'Copiado!',
+    h_data:'Dados e privacidade', l_data:'Tudo fica neste Mac, em ~/.on-duty.', lb_ret:'Guardar o histórico por', ret:{30:'30 dias',90:'90 dias',180:'180 dias',365:'1 ano',0:'Para sempre'}, exp:'⬇ Exportar histórico', clr:'Apagar todo o histórico', confirm_clr:'Apagar todo o histórico registrado? Não dá pra desfazer.', cleared:n=>`${n} eventos apagados.`,
+    datainfo:(n,db)=>`${n} eventos guardados em ${db}`,
+    h_about:'Sobre', ab_ver:'Versão', ab_port:'Porta', ab_events:'Eventos', rerun:'Rodar o assistente de novo', aboutnote:'Desinstalar: ./onduty uninstall, depois apague a pasta e ~/.on-duty.'},
+};
+const SECTIONS = ['profile','tone','schedule','voice','camera','calibration','phrases','data','about'], ICONS = {profile:'👤',tone:'🎭',schedule:'🕘',voice:'🔊',camera:'🎥',calibration:'📐',phrases:'💬',data:'🔒',about:'ℹ️'};
+let cfg = null, voices = [], ui = 'en', T = S.en, st = null, camBusy = false;
+const t = k => T[k];
+const api = (path, body) => fetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body || {})});
+let savedT; function flash(msg) { const e = $('saved'); e.textContent = msg || T.saved; e.classList.add('on'); clearTimeout(savedT); savedT = setTimeout(() => e.classList.remove('on'), 1600); }
+function toast(msg) { const e = $('toast'); e.textContent = msg; e.classList.add('on'); setTimeout(() => e.classList.remove('on'), 2400); }
+async function save(part) { Object.assign(cfg, part); try { const r = await api('/api/config', part); if (!r.ok) throw 0; flash(); } catch { toast('⚠'); } }
+const say = (voice, text) => api('/api/say', {voice, text});
+const sample = async tone => (await (await fetch(`/api/sample?lang=${cfg.lang}&tone=${tone}&name=${encodeURIComponent(cfg.name)}`)).json()).text;
+function bindSwitch(id, key, cb) { const e = $(id); e.classList.toggle('on', !!cfg[key]); e.onclick = async () => { const on = !cfg[key]; e.classList.toggle('on', on); await save({[key]:on}); cb && cb(on); }; }
+
+function labels() {
+  document.documentElement.lang = ui; $('ttl').textContent = t('ttl'); $('back').textContent = t('back'); document.title = 'on-duty · ' + t('ttl').toLowerCase();
+  $('nav').innerHTML = SECTIONS.map(s => `<a href="#s-${s}" data-s="${s}">${ICONS[s]} ${T.nav[s]}<span class="dot"></span></a>`).join('');
+  for (const s of SECTIONS) { if ($('h-' + s)) $('h-' + s).textContent = t('h_' + s); if ($('l-' + s)) $('l-' + s).textContent = t('l_' + s) || ''; }
+  const set = (id, k) => { $(id).textContent = typeof t(k) === 'string' ? t(k) : ''; };
+  [['lb-name','lb_name'],['lb-lang','lb_lang'],['t-notif','notif'],['t-notif-s','notif_s'],['t-sfx','sfx'],['t-sfx-s','sfx_s'],['b-always','always'],['b-hours','hours'],['lb-days','lb_days'],['t-from','from'],['t-to','to'],['t-from2','from'],['t-to2','to'],['t-brk','brk'],
+   ['t-voice-on','voice_on'],['vp','listen'],['lb-cam','lb_cam'],['swc','switch_cam'],['t-mirror','mirror'],['lb-rot','lb_rot'],['rot0','rot0'],['t-phone','phone'],['t-phone-s','phone_s'],['rtune','rtune'],['rcal','rcal'],['tunehint','tunehint'],
+   ['lb-setups','lb_setups'],['setupsnote','setups_note'],['phrm','ph_rm'],['t-cpo','cpo'],['lb-ai','lb_ai'],['cpy','copy'],['lb-ret','lb_ret'],['exp','exp'],['clr','clr'],['rerun','rerun'],['aboutnote','aboutnote']].forEach(([i, k]) => set(i, k));
+  $('aip').textContent = t('ai_prompt');
+  $('ret').innerHTML = Object.entries(T.ret).map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
+}
+
+function render() {
+  $('name').value = cfg.name; $('name').onchange = () => save({name:$('name').value.trim()});
+  $('lang').querySelectorAll('button').forEach(b => { b.classList.toggle('on', b.dataset.v === cfg.lang); b.onclick = async () => { await save({lang:b.dataset.v, voice:''}); ui = b.dataset.v === 'pt_BR' ? 'pt' : 'en'; T = S[ui]; labels(); render(); spy(); }; });
+  // tone cards
+  $('tones').innerHTML = Object.entries(T.tone).map(([k, [em, tt, d]]) => `<button class="tcard ${cfg.tone === k ? 'on' : ''}" data-t="${k}"><span class="em">${em}</span><b>${tt}</b><small>${d}</small><q data-q="${k}">…</q></button>`).join('');
+  $('tones').querySelectorAll('[data-t]').forEach(async b => { const k = b.dataset.t, q = b.querySelector('q'); q.textContent = await sample(k);
+    b.onclick = async () => { await save({tone:k}); $('tones').querySelectorAll('[data-t]').forEach(x => x.classList.toggle('on', x === b)); const tx = await sample(k); q.textContent = tx; say(cfg.voice, tx); }; });
+  bindSwitch('notifications', 'notifications'); bindSwitch('sound_effects', 'sound_effects');
+  // schedule
+  const sc = cfg.schedule, br = sc.breaks[0] || ['12:00', '13:30'];
+  $('enforce').querySelectorAll('button').forEach(b => b.classList.toggle('on', (b.dataset.v === '1') === sc.enforce));
+  $('days').innerHTML = T.days.map((d, i) => `<button class="chip ${sc.days.includes(i + 1) ? 'on' : ''}" data-d="${i + 1}">${d}</button>`).join('');
+  $('st').value = sc.start; $('en').value = sc.end; $('b1').value = br[0]; $('b2').value = br[1]; $('brk').classList.toggle('on', sc.breaks.length > 0);
+  const upd = (persist = true) => { const s = cfg.schedule; s.enforce = $('enforce').querySelector('.on').dataset.v === '1'; s.days = [...$('days').querySelectorAll('.on')].map(b => +b.dataset.d);
+    s.start = $('st').value || '09:00'; s.end = $('en').value || '18:00'; s.breaks = $('brk').classList.contains('on') ? [[$('b1').value || '12:00', $('b2').value || '13:30']] : [];
+    $('sched').style.display = s.enforce ? '' : 'none'; $('brr').style.display = s.breaks.length ? '' : 'none';
+    const lab = s.days.join('') === '12345' ? (ui === 'pt' ? 'Seg–Sex' : 'Mon–Fri') : s.days.map(d => T.days[d - 1]).join(', ');
+    $('sum').textContent = s.enforce ? t('sum_hours')(lab || '—', s.start, s.end, s.breaks[0] ? s.breaks[0].join('–') : '') : t('sum_always'); if (persist) save({schedule:s}); };
+  $('enforce').querySelectorAll('button').forEach(b => b.onclick = () => { $('enforce').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); upd(); });
+  $('days').querySelectorAll('[data-d]').forEach(b => b.onclick = () => { b.classList.toggle('on'); upd(); });
+  for (const id of ['st', 'en', 'b1', 'b2']) $(id).onchange = () => upd(); $('brk').onclick = () => { $('brk').classList.toggle('on'); upd(); }; upd(false);
+  // voice
+  const loc = cfg.lang === 'pt_BR' ? 'pt' : 'en', list = voices.filter(v => v.locale.startsWith(loc)), cur = cfg.voice || (cfg.lang === 'pt_BR' ? 'Luciana' : 'Samantha');
+  $('vs').innerHTML = list.map(v => `<option ${v.name === cur ? 'selected' : ''}>${v.name}</option>`).join('');
+  bindSwitch('voice_on', 'voice_on', on => { $('vrow').style.display = on ? '' : 'none'; }); $('vrow').style.display = cfg.voice_on ? '' : 'none';
+  $('vs').onchange = async () => { await save({voice:$('vs').value}); say($('vs').value, await sample(cfg.tone)); }; $('vp').onclick = async () => say($('vs').value, await sample(cfg.tone));
+  // camera
+  $('camidx').textContent = t('cam_idx')(cfg.camera); bindSwitch('mirror', 'mirror'); bindSwitch('phone_detection', 'phone_detection');
+  $('rot').value = cfg.rotate || 0; $('rotv').textContent = (cfg.rotate || 0).toFixed(1) + '°';
+  $('rot').oninput = () => { $('rotv').textContent = (+$('rot').value).toFixed(1) + '°'; }; $('rot').onchange = () => save({rotate:+$('rot').value});
+  $('rot0').onclick = async () => { $('rot').value = 0; $('rotv').textContent = '0.0°'; await save({rotate:0}); };
+  $('lvl').textContent = t('level'); $('lvl').onclick = async () => { await api('/api/level'); $('lvl').textContent = t('leveling'); setTimeout(async () => { const j = await (await fetch('/api/config')).json(); cfg.rotate = j.config.rotate; $('rot').value = cfg.rotate; $('rotv').textContent = cfg.rotate.toFixed(1) + '°'; $('lvl').textContent = t('level'); flash(); }, 3800); };
+  $('swc').onclick = async () => { if (camBusy) return; camBusy = true; const before = (st && st.camera_note) || 0; await save({camera:(cfg.camera + 1) % 4}); await new Promise(r => setTimeout(r, 3500));
+    const j = await (await fetch('/api/config')).json(); cfg.camera = j.config.camera; $('camidx').textContent = t('cam_idx')(cfg.camera);
+    const s2 = await (await fetch('/status')).json(); if ((s2.camera_note || 0) !== before) $('camnote').textContent = t('cam_none'); else $('camnote').textContent = ''; camBusy = false; $('cam').src = '/stream.mjpg?' + Date.now(); };
+  // phrases
+  $('custom_phrases_only').classList.toggle('on', !!cfg.custom_phrases_only); bindSwitch('custom_phrases_only', 'custom_phrases_only');
+  $('cpy').onclick = () => { navigator.clipboard?.writeText($('aip').textContent); $('cpy').textContent = t('copied'); setTimeout(() => $('cpy').textContent = t('copy'), 1400); };
+  // data
+  $('ret').value = String(cfg.retention_days); $('ret').onchange = () => save({retention_days:+$('ret').value});
+  $('clr').onclick = async () => { if (!confirm(t('confirm_clr'))) return; const j = await (await api('/api/data', {action:'clear_history'})).json(); toast(t('cleared')(j.removed)); about(); };
+  $('rtune').onclick = async () => { await api('/api/calibrate', {action:'reset_tuning'}); flash(); };
+  $('rcal').onclick = async () => { if (!confirm(t('confirm_rcal'))) return; await api('/api/calibrate', {action:'reset'}); flash(); setups(); };
+  $('phrm').onclick = async () => { await api('/api/phrases', {action:'remove'}); phrases(); flash(); };
+}
+
+async function phrases() { const p = await (await fetch('/api/phrases')).json(); $('phstate').textContent = p.custom ? t('ph_custom')(p.lines) : t('ph_none'); $('phpath').textContent = p.custom ? p.path : ''; $('phrm').style.display = p.custom ? '' : 'none'; }
+async function about() { const a = await (await fetch('/api/about')).json();
+  $('aboutstat').innerHTML = `<div><b>${a.version}</b><span>${t('ab_ver')}</span></div><div><b>${a.port}</b><span>${t('ab_port')}</span></div><div><b>${a.events}</b><span>${t('ab_events')}</span></div>`;
+  $('datainfo').textContent = t('datainfo')(a.events, a.db); }
+async function setups() { const l = await (await fetch('/api/setups')).json();
+  $('setups').innerHTML = l.length ? l.map(s => `<div class="item"><div class="sp"><b>${s.label || s.sig}</b>${s.active ? ` <span class="badge ok">${t('setups_active')}</span>` : ''}<small>${s.zones.join(' · ')} · ${new Date(s.created * 1000).toLocaleDateString(ui === 'pt' ? 'pt-BR' : 'en-US')}</small></div><button class="btn sm danger" data-sig="${s.sig}">${t('remove')}</button></div>`).join('') : `<div class="hint">${t('setups_none')}</div>`;
+  $('setups').querySelectorAll('[data-sig]').forEach(b => b.onclick = async () => { await api('/api/calibrate', {action:'delete_setup', sig:b.dataset.sig}); setTimeout(setups, 400); flash(); }); }
+
+let radar = null;
+function live() {
+  fetch('/status').then(r => r.json()).then(s => { st = s; const c = s.calibration || {}, state = c.state || 'never', need = state !== 'ok';
+    $('calcall').classList.toggle('need', need); $('calttl').textContent = t('cal_t')[state] || ''; $('calsub').textContent = (t('cal_s')[state] || (() => ''))(c.label) || ''; $('calgo').textContent = need ? t('cal_go') : t('cal_redo');
+    document.querySelector('nav a[data-s="calibration"]')?.classList.toggle('need', need);
+    $('h-calibration').innerHTML = `${t('h_calibration')} <span class="badge ${state === 'ok' ? 'ok' : state === 'drift' ? 'bad' : 'warn'}">${t('st')[state] || state}</span>`;
+    const th = s.cfg || {}, tu = c.tuning || {};
+    $('calstat').innerHTML = `<div><b>${(c.zones || []).length || '–'}</b><span>${t('stat_zones')}${(c.zones || []).length ? ': ' + c.zones.join(', ') : ''}</span></div><div><b>${th.pitch_delta ?? '–'}${t('deg')}</b><span>${t('stat_pd')}</span></div><div><b>${th.gaze_delta ?? '–'}</b><span>${t('stat_gd')}</span></div><div><b>${c.noise || 0}${t('deg')}</b><span>${t('stat_noise')}</span></div><div><b>${tu.pitch || tu.gaze ? `${tu.pitch >= 0 ? '+' : ''}${tu.pitch}°` : t('none')}</b><span>${t('stat_tune')}</span></div>`;
+    $('camhealth').textContent = (s.health || []).length ? t('hl_' + s.health[0]) : s.camera_ok === false ? '' : t('hl_ok');
+    if (s.camera_ok !== false || true) (radar = radar || Radar($('radar'), {size:260})).set(s); }).catch(() => {});
+}
+
+function spy() { const links = [...document.querySelectorAll('nav a')]; const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) links.forEach(l => l.classList.toggle('on', l.dataset.s === e.target.id.slice(2))); }), {rootMargin:'-20% 0px -70% 0px'});
+  SECTIONS.forEach(s => io.observe($('s-' + s))); links[0]?.classList.add('on'); }
+
+(async () => {
+  const j = await (await fetch('/api/config')).json(); cfg = j.config; voices = j.voices; ui = cfg.lang === 'pt_BR' ? 'pt' : 'en'; T = S[ui];
+  labels(); render(); phrases(); about(); setups(); live(); setInterval(live, 400); spy();
+})();
+</script>
+</body>
+</html>

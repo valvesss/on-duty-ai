@@ -188,7 +188,7 @@ def cmd_stats(_a) -> None:
 def cmd_setup(a) -> None:
     cfg = config.load()
     if a.name is None and a.lang is None and a.voice is None:  # no flags: the wizard is the setup
-        sh("open", f"http://localhost:{cfg['port']}/setup?edit")
+        sh("open", f"http://localhost:{cfg['port']}/settings")
         return
     cfg["name"] = cfg["name"] if a.name is None else a.name
     cfg["lang"] = a.lang or cfg["lang"]

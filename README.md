@@ -97,7 +97,7 @@ Open <http://localhost:4269> and keep it on a second monitor.
 - **📸 Snap** — builds the shareable card; download, copy, or share. Level 4–5 lines make the button pulse: those are the ones worth posting.
 - **Hall of shame** — today's heaviest lines, one tap each from becoming a card.
 - History charts, focus streak, and a collapsible panel with the raw signals and the live head-pose radar.
-- **⚙** reopens the wizard any time; **⏸** pauses for an hour or until tomorrow.
+- **📐 Calibrate** is always in the header (amber and pulsing when this setup needs it). **⚙** opens **Settings**; **⏸** pauses for an hour or until tomorrow.
 
 ## Personalize the lines
 
@@ -142,7 +142,7 @@ Two buttons keep it honest. **🙅 I wasn't on my phone** (on the stage while it
 ./onduty install | uninstall      install / remove the background service (starts at login)
 ./onduty start | stop | restart   control it
 ./onduty open                     open the dashboard
-./onduty setup                    reopen the setup wizard
+./onduty setup                    open Settings (the first-run wizard is at /setup)
 ./onduty recalibrate              recalibrate for this desk / monitors / camera
 ./onduty pause 60 | tomorrow | 0  pause for N minutes, until tomorrow, or resume
 ./onduty status | logs | stats    what's it doing, tail the log, summary from the local database
@@ -151,9 +151,13 @@ Two buttons keep it honest. **🙅 I wasn't on my phone** (on the stage while it
 ./onduty phrases template | validate | sources
 ```
 
+## Settings
+
+The **⚙** button (or `./onduty setup`) opens a settings page with everything, saved as you change it: profile and language, humor and alert sounds, work schedule, voice, camera (switch, mirror, straighten) and phone detection, calibration (status, saved setups per desk/monitor, reset fine-tuning), your custom phrases, data retention, **export** and **delete** of your history, and about.
+
 ## Configuration
 
-Everything lives in `~/.on-duty/config.json` and is editable from the wizard.
+Everything also lives in `~/.on-duty/config.json`.
 
 | Key | Default | |
 |---|---|---|
@@ -166,6 +170,7 @@ Everything lives in `~/.on-duty/config.json` and is editable from the wizard.
 | `mirror` | `true` | Selfie-style preview (detection always uses the raw image) |
 | `rotate` | `0` | Degrees to straighten a tilted camera (set by *Straighten*) |
 | `phone_detection` | `true` | The YOLO phone detector |
+| `notifications` / `sound_effects` | `true` | macOS notification on start and escalation; the alert sound from level 3 |
 | `retention_days` | `365` | Events older than this are deleted at startup (`0` = keep forever) |
 | `port` | `4269` | Dashboard at `http://localhost:<port>` (restart after changing) |
 | `custom_phrases_only` | `false` | Use only your `phrases.json` instead of mixing with the built-ins |

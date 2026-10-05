@@ -29,6 +29,9 @@
   .banner button { margin-left:auto; border:0; background:transparent; font-size:20px; padding:0 4px; color:inherit; box-shadow:none }
   .row2 { display:flex; gap:16px; align-items:center; flex-wrap:wrap; margin:14px 0 }
   .fb { background:#ffffff26; color:#fff; border:0; backdrop-filter:blur(6px); font-weight:700; font-size:13px; padding:6px 12px }
+  .calbtn { text-decoration:none; font-weight:800; font-size:14px; color:#fff; border-radius:99px; padding:8px 16px; background:linear-gradient(135deg,var(--c1),var(--c2)); box-shadow:0 2px 10px #0003; position:relative; white-space:nowrap }
+  .calbtn.need { background:linear-gradient(135deg,#d97706,#f59e0b); animation:pulse 1.6s infinite }
+  .calbtn.need::after { content:""; position:absolute; top:-3px; right:-3px; width:10px; height:10px; border-radius:50%; background:#ef4444; border:2px solid var(--bg) }
   .gear { text-decoration:none; color:var(--fg); border:1px solid var(--line); background:var(--card); border-radius:99px; padding:6px 12px; font-size:17px; line-height:1.2 }
   .menuwrap { position:relative } .menu { position:absolute; right:0; top:110%; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:6px; display:none; z-index:30; box-shadow:0 10px 30px #0004; min-width:170px }
   .menu.on { display:grid; gap:4px } .menu button { border:0; text-align:left; border-radius:10px }
@@ -144,9 +147,10 @@
 <main>
   <header>
     <img src="/logo.svg" alt="" class="logo"><h1>on-duty</h1><span class="pill" id="pill">…</span><span class="sp"></span>
+    <a href="/setup?calibrate" class="calbtn" id="calLink"></a>
     <span class="menuwrap"><button id="camBtn" data-i="cam_menu"></button><div class="menu" id="cmenu"><button id="mirror"></button><button id="blur"></button><button id="level"></button><button id="unlevel" data-i="unlevel"></button></div></span><button id="test" data-i="test"></button>
     <span class="menuwrap"><button id="pause"></button><div class="menu" id="pmenu"><button data-m="60" data-i="p1h"></button><button data-m="tomorrow" data-i="ptom"></button></div></span>
-    <a href="/setup?edit" class="gear" title="Settings" aria-label="Settings">⚙</a><button id="photo" data-i="photo"></button>
+    <a href="/settings" class="gear" id="gear" title="Settings" aria-label="Settings">⚙</a><button id="photo" data-i="photo"></button>
   </header>
 
   <div class="banner" id="banner" style="display:none"><span id="bmsg"></span><a href="/setup?calibrate" id="bgo"></a><button id="bx" aria-label="Dismiss">×</button></div>
@@ -234,7 +238,7 @@ const STR = {
     cal_never:'Ainda não calibrei com você. Leva 40 s e acerta bastante.', cal_new:'Setup novo detectado (tela ou câmera diferente). Recalibrar?', cal_drift:'Parece que sua postura, a câmera ou o notebook mudou de lugar. Recalibrar?', cal_go:'📐 Calibrar',
     hl_dark:'Está escuro: não consigo te ver direito.', hl_blocked:'Quase não te vejo enquanto você digita: câmera tapada ou fora de posição?',
     fb_no:'🙅 Não estava no celular', fb_miss:'📱 Você deixou passar', fb_no_t:'Anotado: fico mais relaxado.', fb_miss_t:'Anotado: fico mais rigoroso.', radar_hint:'Você é o ponto. A faixa vermelha é onde eu daria bronca; as manchas verdes são os lugares onde você trabalha.', tuned:t=>`ajuste fino: cabeça ${t.pitch >= 0 ? '+' : ''}${t.pitch}° · olhar ${t.gaze >= 0 ? '+' : ''}${t.gaze}`,
-    cam_menu:'🎥 Câmera', mirror:'↔ Espelhar', unmirror:'↔ Sem espelho', level:'📐 Endireitar (sente reto)', leveling:'Medindo… sente reto', unlevel:'↺ Zerar inclinação', lv_ok:'Câmera endireitada.', lv_no:'Não vi seu rosto: nada mudou.',
+    cal_btn:'📐 Calibrar', cal_btn_ok:'📐 Recalibrar', cam_menu:'🎥 Câmera', mirror:'↔ Espelhar', unmirror:'↔ Sem espelho', level:'📐 Endireitar (sente reto)', leveling:'Medindo… sente reto', unlevel:'↺ Zerar inclinação', lv_ok:'Câmera endireitada.', lv_no:'Não vi seu rosto: nada mudou.',
     pause:'⏸ Pausar', resume:'▶ Retomar', p1h:'Por 1 hora', ptom:'Até amanhã', blur:'Borrar câmera', unblur:'Mostrar câmera', test:'Testar alerta', photo:'📸 Tirar foto', download:'Baixar', copy:'Copiar', share:'Compartilhar', close:'Fechar',
     head:'Cabeça vs. seu normal', gaze:'Olhar pra baixo vs. normal', downwin:'Olhando pra baixo (janela)', idlelbl:'Sem teclado/mouse', phonelbl:'Celular na câmera (YOLO)',
     lg_head:'cabeça (°)', lg_gaze:'olhar ×40', lg_down:'pra baixo', lg_phone:'celular visto', signals:'Sinais e detalhes', events:'Eventos',
@@ -258,7 +262,7 @@ const STR = {
     cal_never:'I haven’t calibrated to you yet. It takes 40 s and makes a big difference.', cal_new:'New setup detected (different screen or camera). Recalibrate?', cal_drift:'Your posture, camera or laptop seems to have moved. Recalibrate?', cal_go:'📐 Calibrate',
     hl_dark:'It’s dark: I can’t see you well.', hl_blocked:'I barely see you while you type: camera covered or out of position?',
     fb_no:'🙅 I wasn’t on my phone', fb_miss:'📱 You missed one', fb_no_t:'Noted: I’ll be more relaxed.', fb_miss_t:'Noted: I’ll be stricter.', radar_hint:'You’re the dot. The red band is where I’d nag; the green blobs are where you work.', tuned:t=>`fine-tuning: head ${t.pitch >= 0 ? '+' : ''}${t.pitch}° · gaze ${t.gaze >= 0 ? '+' : ''}${t.gaze}`,
-    cam_menu:'🎥 Camera', mirror:'↔ Mirror', unmirror:'↔ No mirror', level:'📐 Straighten (sit upright)', leveling:'Measuring… sit upright', unlevel:'↺ Reset tilt', lv_ok:'Camera straightened.', lv_no:'I couldn’t see your face: nothing changed.',
+    cal_btn:'📐 Calibrate', cal_btn_ok:'📐 Recalibrate', cam_menu:'🎥 Camera', mirror:'↔ Mirror', unmirror:'↔ No mirror', level:'📐 Straighten (sit upright)', leveling:'Measuring… sit upright', unlevel:'↺ Reset tilt', lv_ok:'Camera straightened.', lv_no:'I couldn’t see your face: nothing changed.',
     pause:'⏸ Pause', resume:'▶ Resume', p1h:'For 1 hour', ptom:'Until tomorrow', blur:'Blur camera', unblur:'Show camera', test:'Test alert', photo:'📸 Snap', download:'Download', copy:'Copy', share:'Share', close:'Close',
     head:'Head vs. your normal', gaze:'Looking down vs. normal', downwin:'Looking down (window)', idlelbl:'No keyboard/mouse', phonelbl:'Phone in camera (YOLO)',
     lg_head:'head (°)', lg_gaze:'gaze ×40', lg_down:'looking down', lg_phone:'phone seen', signals:'Signals & details', events:'Events',
@@ -413,6 +417,7 @@ async function tick() {
     if (s.said && s.said.kind === 'back' && now / 1000 - s.said.t < 20 && !s.scrolling) { key = 'back'; pal = PAL[0]; }
     setStage(key, lvl, pal);
     banner(s);
+    { const cs = (s.calibration || {}).state, need = s.onboarded && cs && cs !== 'ok'; $('calLink').classList.toggle('need', !!need); $('calLink').textContent = need ? L.cal_btn : L.cal_btn_ok; }
     $('fbNo').style.display = s.scrolling ? '' : 'none'; $('fbNo').textContent = L.fb_no; $('fbMiss').textContent = L.fb_miss; $('radarHint').textContent = L.radar_hint;
     $('tuned').textContent = s.calibration && s.calibration.tuning && (s.calibration.tuning.pitch || s.calibration.tuning.gaze) ? L.tuned(s.calibration.tuning) : '';
     $('polaroid').classList.toggle('sleepy', !!sleepy);

@@ -274,6 +274,24 @@ class Dashboard(BaseHTTPRequestHandler):
             self._send((HERE / "assets" / name).read_bytes(), ctype, headers={"Cache-Control": "public, max-age=3600"})
         elif path == "/api/config":
             self._json({"config": CFG, "voices": voices(), "tones": config.TONES})
+        elif path == "/api/setups":
+            cur = (STATE["status"].get("calibration") or {}).get("sig")
+            out = []
+            for k in db.keys("setup:"):
+                prof, _ = db.get(k)
+                out.append({"sig": k[6:], "label": prof.get("label", ""), "zones": [z["name"] for z in prof.get("zones", [])],
+                            "created": prof.get("created", 0), "sensitivity": prof.get("sensitivity", "normal"), "active": k[6:] == cur})
+            self._json(sorted(out, key=lambda x: -x["created"]))
+        elif path == "/api/phrases":
+            custom = json.loads(config.CUSTOM_PHRASES.read_text()) if config.CUSTOM_PHRASES.exists() else None
+            self._json({"custom": bool(custom), "lines": sum(map(len, custom["levels"])) if custom else 0, "path": str(config.CUSTOM_PHRASES)})
+        elif path == "/api/about":
+            m = __import__("re").search(r'^version = "(.*?)"', (HERE / "pyproject.toml").read_text(), __import__("re").M)
+            self._json({"version": m.group(1) if m else "?", "port": CFG["port"], "events": db.count_events(), "db": str(db.DB_PATH), "config": str(config.CONFIG_PATH)})
+        elif path == "/api/export":
+            self._send(db.export_ndjson(), "application/x-ndjson", headers={"Content-Disposition": 'attachment; filename="on-duty-history.ndjson"'})
+        elif path == "/settings":
+            self._send((HERE / "settings.html").read_bytes(), "text/html; charset=utf-8")
         elif path == "/api/sample":
             self._json({"text": sample_line(args.get("lang", "en_US"), args.get("tone", "balanced"), args.get("name", ""))})
         elif path == "/setup":
@@ -312,6 +330,11 @@ class Dashboard(BaseHTTPRequestHandler):
                 STATE["pause_until"] = time.time() + float(m) * 60 if float(m) > 0 else 0
         elif self.path == "/api/feedback":  # {"kind": "false_positive" | "missed"}
             STATE["cmds"].append({"action": "feedback", "kind": body.get("kind", "false_positive")})
+        elif self.path == "/api/data" and body.get("action") == "clear_history":
+            return self._json({"removed": db.clear_events()})
+        elif self.path == "/api/phrases" and body.get("action") == "remove":
+            config.CUSTOM_PHRASES.unlink(missing_ok=True)
+            STATE["reload"] = True
         elif self.path == "/api/level":  # measure the camera tilt from your eye line (sit upright for 3 s)
             STATE["cmds"].append({"action": "level"})
         elif self.path == "/api/calibrate":  # start | finish | cancel | reset | discard — handled by the engine loop
@@ -412,9 +435,10 @@ class Nagger:
         lv = self.level(n)
         if n == 1 or lv != self.level(n - 1):  # notification only at the start and on level-up
             title = f"📵 on-duty{' · ' + self.cfg['name'] if self.cfg['name'] else ''}"
-            subprocess.Popen(["osascript", "-e", f'display notification "{self.t["level"].format(lv=lv + 1)}" '
-                                                 f'with title "{title}" sound name "Basso"'])
-        if lv >= 2:
+            if self.cfg["notifications"]:
+                subprocess.Popen(["osascript", "-e", f'display notification "{self.t["level"].format(lv=lv + 1)}" '
+                                                     f'with title "{title}" sound name "Basso"'])
+        if lv >= 2 and self.cfg["sound_effects"]:
             subprocess.Popen(["afplay", "-v", str(lv), "/System/Library/Sounds/Sosumi.aiff"])
         return self.say(self._pick(lv, self.levels[lv]), lv, minutes, n)
 
@@ -567,6 +591,19 @@ def main() -> None:
                     level_ses = {"t0": t0, "vals": []}
                 elif act == "unphone":
                     cal["phone"] = None
+                elif act == "delete_setup" and c.get("sig"):
+                    db.delete(f"setup:{c['sig']}")
+                    db.delete(f"tuning:{c['sig']}")
+                    if c["sig"] == setup["sig"]:
+                        zones, overrides, tuning = [], {}, {"pitch": 0.0, "gaze": 0.0}
+                        setup.update(state="new_setup" if db.keys("setup:") else "never", label="")
+                        resid.clear()
+                        drifting = False
+                    log(f"setup {c['sig']} removed")
+                elif act == "reset_tuning" and setup["sig"]:
+                    tuning = {"pitch": 0.0, "gaze": 0.0}
+                    db.delete(f"tuning:{setup['sig']}")
+                    log("fine-tuning reset")
                 elif act == "reset" and setup["sig"]:
                     db.delete(f"setup:{setup['sig']}")
                     zones, overrides, th = [], {}, eff_th()
@@ -790,7 +827,7 @@ def main() -> None:
             health = [h for h, bad in (("dark", bright < 45), ("blocked", len(seen_hist) >= int(60 * a.fps) and sum(seen_hist) / len(seen_hist) < 0.4)) if bad]
             state = "drift" if drifting else setup["state"]
             STATE["status"] = {
-                "calibration": {"state": state, "label": setup["label"], "zones": [z["name"] for z in zones], "zone_data": zones, "tuning": tuning, "noise": round(noise, 1), "displays": setup["displays"],
+                "calibration": {"sig": setup["sig"], "state": state, "label": setup["label"], "zones": [z["name"] for z in zones], "zone_data": zones, "tuning": tuning, "noise": round(noise, 1), "displays": setup["displays"],
                                 "created": setup["created"], "thresholds": overrides, "camera": CFG["camera"]},
                 "cal": {"open": calibrating, "live": cal_live, "zones": cal["zones"], "phone": cal["phone"], "last": cal["last"]},
                 "pose": ({"pitch": round(ps.pitch, 1), "yaw": round(ps.yaw, 1), "gaze": round(ps.gaze, 2), "base": round(base, 1) if base is not None else None} if ps else None),

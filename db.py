@@ -109,3 +109,23 @@ def keys(prefix: str) -> list[str]:
 def delete(key: str) -> None:
     with _lock:
         con().execute("DELETE FROM profile WHERE key=?", (key,))
+
+
+def export_ndjson() -> bytes:
+    """Every event, unbounded (the dashboard only reads the last HISTORY_DAYS)."""
+    with _lock:
+        rows = con().execute("SELECT t, kind, start, minutes, n, level, cause, said FROM events ORDER BY t").fetchall()
+    keys = ("t", "kind", "start", "minutes", "n", "level", "cause", "said")
+    return "\n".join(json.dumps({k: v for k, v in zip(keys, r) if v is not None}, ensure_ascii=False) for r in rows).encode()
+
+
+def clear_events() -> int:
+    with _lock:
+        n = con().execute("SELECT count(*) FROM events").fetchone()[0]
+        con().execute("DELETE FROM events")
+    return n
+
+
+def count_events() -> int:
+    with _lock:
+        return con().execute("SELECT count(*) FROM events").fetchone()[0]
