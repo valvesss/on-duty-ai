@@ -41,6 +41,44 @@ def download_models() -> None:
         urllib.request.urlretrieve(url, dest)
 
 
+NOTIFIER = Path.home() / "Applications/on-duty.app"
+NOTIFIER_ID = "com.onduty.notifier"
+
+
+def build_notifier() -> None:
+    """Notifications come from a small app in ~/Applications so macOS shows on-duty's icon and name (and asks permission
+    once). It must live in a normal location: macOS refuses notification registration for apps in temp folders.
+    Falls back to plain AppleScript notifications when there's no Swift compiler (xcode-select --install)."""
+    if not shutil.which("swiftc"):
+        print("note: no Swift compiler found, notifications will use the basic style (xcode-select --install to fix)")
+        return
+    shutil.rmtree(NOTIFIER, ignore_errors=True)
+    (NOTIFIER / "Contents/MacOS").mkdir(parents=True)
+    (NOTIFIER / "Contents/Resources").mkdir()
+    shutil.copy(DIR / "assets/icon.icns", NOTIFIER / "Contents/Resources/icon.icns")
+    (NOTIFIER / "Contents/Info.plist").write_text(f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>CFBundleIdentifier</key><string>{NOTIFIER_ID}</string>
+  <key>CFBundleName</key><string>on-duty</string>
+  <key>CFBundleDisplayName</key><string>on-duty</string>
+  <key>CFBundleExecutable</key><string>notify</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleIconFile</key><string>icon</string>
+  <key>CFBundleShortVersionString</key><string>1.0</string>
+  <key>LSUIElement</key><true/>
+</dict></plist>
+""")
+    r = subprocess.run(["swiftc", "-O", "-swift-version", "5", str(DIR / "native/notify.swift"), "-o", str(NOTIFIER / "Contents/MacOS/notify")],
+                       capture_output=True, text=True)
+    if r.returncode:
+        shutil.rmtree(NOTIFIER, ignore_errors=True)
+        print("note: couldn't build the notifier, using basic notifications:\n" + r.stderr[-400:])
+        return
+    sh("codesign", "--force", "-s", "-", str(NOTIFIER), check=True)
+    sh("/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister", "-f", str(NOTIFIER))
+
+
 def build_app() -> None:
     shutil.rmtree(APP, ignore_errors=True)
     (APP / "Contents/MacOS").mkdir(parents=True)
@@ -48,7 +86,8 @@ def build_app() -> None:
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
   <key>CFBundleIdentifier</key><string>{LABEL}</string>
-  <key>CFBundleName</key><string>OnDuty</string>
+  <key>CFBundleName</key><string>on-duty</string>
+  <key>CFBundleDisplayName</key><string>on-duty</string>
   <key>CFBundleExecutable</key><string>on-duty</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleIconFile</key><string>icon</string>
@@ -66,6 +105,7 @@ exec "{DIR}/.venv/bin/python" "{DIR}/on_duty.py" --debug >> "{LOG}" 2>&1
 """)
     launcher.chmod(0o755)
     sh("codesign", "--force", "-s", "-", str(APP), check=True)
+    build_notifier()
 
 
 def unload() -> None:
@@ -134,6 +174,7 @@ def cmd_update(_a) -> None:
 
 def cmd_uninstall(_a) -> None:
     cmd_stop(_a)
+    shutil.rmtree(NOTIFIER, ignore_errors=True)
     PLIST.unlink(missing_ok=True)
     print("removed")
 
@@ -227,6 +268,13 @@ def cmd_doctor(_a) -> None:
     for name in MODELS:
         check(f"model {name}", (DIR / "models" / name).exists(), "./onduty install")
     check("service installed", PLIST.exists(), "./onduty install")
+    check("notifier app (~/Applications/on-duty.app)", NOTIFIER.exists(), "./onduty install (needs the Xcode Command Line Tools: xcode-select --install)")
+    if NOTIFIER.exists():
+        out = Path("/tmp/onduty-notif-status")
+        out.unlink(missing_ok=True)
+        sh("open", "-W", "-n", "-g", str(NOTIFIER), "--stdout", str(out), "--args", "--status")
+        allowed = "authorization=2" in (out.read_text() if out.exists() else "")
+        check("notifications allowed for on-duty", allowed, "System Settings › Notifications › on-duty (or trigger a test from the dashboard)")
     try:
         cal = json.loads(urllib.request.urlopen(f"http://localhost:{config.load()['port']}/status", timeout=2).read()).get("calibration", {})
         check(f"calibrated for this setup ({cal.get('label') or cal.get('state')})", cal.get("state") == "ok", "./onduty recalibrate")

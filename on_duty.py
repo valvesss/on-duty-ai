@@ -49,9 +49,15 @@ STATE: dict = {"status": {}, "jpeg": b"", "events": collections.deque(maxlen=30)
                "reload": False, "pause_until": 0.0, "preview": None, "cmds": collections.deque()}
 
 T = {  # the few strings the engine says outside the phrase packs
-    "pt_BR": {"focus_done": "Foco concluído: {m} e {s}.", "slips0": "nenhuma escapada", "slips1": "1 escapada", "slipsN": "{n} escapadas",
+    "pt_BR": {"lvl_names": ["Gentil", "Sarcástico", "Cobrança", "Drama", "Caos"], "lvl_emoji": ["😇", "😏", "😤", "🎭", "🤪"], "level_sub": "Nível {lv} de 5",
+              "n_focus": "🎯 Foco concluído", "n_cal": "📐 Calibração", "n_cal_new": "Setup novo detectado", "n_cal_drift": "Algo mudou de lugar",
+              "n_cal_body": "Leva 40 s. Toque para calibrar.", "n_upd": "⬆️ Atualização disponível", "n_upd_body": "Rode ./onduty update no terminal.",
+              "focus_done": "Foco concluído: {m} e {s}.", "slips0": "nenhuma escapada", "slips1": "1 escapada", "slipsN": "{n} escapadas",
               "level": "Nível {lv} de 5", "sec": "{n} segundos", "min1": "1 minuto", "min": "{n} minutos"},
-    "en_US": {"focus_done": "Focus done: {m} and {s}.", "slips0": "no slips", "slips1": "1 slip", "slipsN": "{n} slips",
+    "en_US": {"lvl_names": ["Gentle", "Sarcastic", "Firm", "Drama", "Chaos"], "lvl_emoji": ["😇", "😏", "😤", "🎭", "🤪"], "level_sub": "Level {lv} of 5",
+              "n_focus": "🎯 Focus complete", "n_cal": "📐 Calibration", "n_cal_new": "New setup detected", "n_cal_drift": "Something moved",
+              "n_cal_body": "Takes 40 s. Tap to calibrate.", "n_upd": "⬆️ Update available", "n_upd_body": "Run ./onduty update in a terminal.",
+              "focus_done": "Focus done: {m} and {s}.", "slips0": "no slips", "slips1": "1 slip", "slipsN": "{n} slips",
               "level": "Level {lv} of 5", "sec": "{n} seconds", "min1": "1 minute", "min": "{n} minutes"},
 }
 
@@ -128,7 +134,11 @@ def check_updates() -> None:
     try:
         subprocess.run(["git", "-C", str(HERE), "fetch", "--quiet", "origin", "main"], timeout=60, check=True, capture_output=True)
         behind = int(subprocess.run(["git", "-C", str(HERE), "rev-list", "--count", "HEAD..origin/main"], capture_output=True, text=True, check=True).stdout)
+        was = (STATE.get("update") or {}).get("behind", 0)
         STATE["update"] = {"behind": behind, "checked": int(time.time())}
+        if behind and not was and CFG.get("notifications"):
+            tr = T.get(CFG["lang"], T["en_US"])
+            osal.notify(tr["n_upd"], tr["n_upd_body"], url=f"http://localhost:{CFG['port']}/settings", thread="update")
     except (subprocess.SubprocessError, ValueError, OSError):
         STATE["update"] = {"behind": 0, "checked": int(time.time()), "error": True}
 
@@ -438,13 +448,24 @@ class Nagger:
 
     def nag(self, n: int, minutes: float) -> str:
         lv = self.level(n)
-        if n == 1 or lv != self.level(n - 1):  # notification only at the start and on level-up
-            title = f"📵 on-duty{' · ' + self.cfg['name'] if self.cfg['name'] else ''}"
-            if self.cfg["notifications"]:
-                osal.notify(title, self.t["level"].format(lv=lv + 1))
         if lv >= 2 and self.cfg["sound_effects"]:
             osal.play_alert(lv)
-        return self.say(self._pick(lv, self.levels[lv]), lv, minutes, n)
+        said = self.say(self._pick(lv, self.levels[lv]), lv, minutes, n)
+        if n == 1 or lv != self.level(n - 1):  # a notification only at the start and on level-up
+            self.push(lv, said)
+        return said
+
+    def url(self, path: str = "/") -> str:
+        return f"http://localhost:{self.cfg['port']}{path}"
+
+    def notice(self, title: str, body: str, subtitle: str = "", path: str = "/", thread: str = "") -> None:
+        if self.cfg["notifications"]:
+            osal.notify(title, body, subtitle=subtitle, url=self.url(path), thread=thread)
+
+    def push(self, lv: int, text: str) -> None:
+        """The nag as a notification: the level's name and mood as the title, the line itself as the body."""
+        name, sub = self.cfg["name"], self.t["level_sub"].format(lv=lv + 1)
+        self.notice(f"{self.t['lvl_emoji'][lv]} {self.t['lvl_names'][lv]}", text, f"{name} · {sub}" if name else sub, thread="nag")
 
     def welcome(self, minutes: float) -> str:
         tier = "quick" if minutes < 1 else "medium" if minutes < 5 else "long"
@@ -560,6 +581,7 @@ def main() -> None:
         if rec["completed"]:
             mins_txt = tr["min1"] if round(rec["actual"]) == 1 else tr["min"].format(n=round(rec["actual"]))
             nag.say(tr["focus_done"].format(m=mins_txt, s=slips), 0, kind="focus_done")
+            nag.notice(tr["n_focus"], slips, mins_txt, "/summary", "focus")
         focus = None
 
     def publish_sleep(m: str, why: str = "") -> None:
@@ -748,6 +770,9 @@ def main() -> None:
                         work_pitch.clear()
                         work_gaze.clear()
                     log(f"setup {sig}: " + (f"calibrated ({len(zones)} zone(s))" if prof else f"not calibrated ({setup['state']})"))
+                    if not first and loaded["state"] == "new_setup" and CFG["onboarded"]:  # you plugged a monitor / switched camera
+                        tr = T.get(CFG["lang"], T["en_US"])
+                        nag.notice(tr["n_cal"], tr["n_cal_body"], tr["n_cal_new"], "/setup?calibrate", "calibration")
 
             pose = head_pose(lm, frame)
             phone_boxes = []
@@ -829,10 +854,15 @@ def main() -> None:
                 drifting = calibration.drift_state(drifting, statistics.median(resid))
                 if drifting != was:
                     log(f"posture drift {'detected' if drifting else 'cleared'} (median {statistics.median(resid):+.1f}°)")
+                    if drifting and CFG["onboarded"]:
+                        tr = T.get(CFG["lang"], T["en_US"])
+                        nag.notice(tr["n_cal"], tr["n_cal_body"], tr["n_cal_drift"], "/setup?calibrate", "calibration")
             if STATE["test"]:
                 STATE["test"] = False
                 lv = random.randrange(nag.tone["start"], nag.tone["cap"] + 1)
-                log(f"📵 test (level {lv + 1}): {nag.say(random.choice(nag.levels[lv]), lv, 3, 7, kind='test')}")
+                said = nag.say(random.choice(nag.levels[lv]), lv, 3, 7, kind="test")
+                nag.push(lv, said)  # also how the notification permission prompt gets triggered during setup
+                log(f"📵 test (level {lv + 1}): {said}")
             if now - last_save >= 60 and work_pitch:  # persist posture so restarts don't recalibrate
                 last_save = now
                 db.put("calibration", {"pitch": list(work_pitch)[-300:], "gaze": list(work_gaze)[-300:], "sig": setup["sig"]})

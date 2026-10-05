@@ -6,6 +6,7 @@ import ctypes
 import ctypes.util
 import re
 import subprocess
+from pathlib import Path
 
 _cg = ctypes.CDLL(ctypes.util.find_library("CoreGraphics"))
 _cg.CGMainDisplayID.restype = ctypes.c_uint32
@@ -77,9 +78,23 @@ def speak(voice: str, rate: int, lines: list[str]) -> subprocess.Popen:
     return subprocess.Popen(["say", "-v", voice, "-r", str(rate), " [[slnc 600]] ".join(lines)])
 
 
-def notify(title: str, message: str, sound: bool = True) -> None:
+_NOTIFIER = Path.home() / "Applications/on-duty.app"  # built by `onduty install` (see build_notifier)
+
+
+def notify(title: str, message: str, subtitle: str = "", sound: bool = False, url: str = "", thread: str = "") -> None:
+    """A desktop notification from the on-duty app (its icon and name; a click opens `url`). Falls back to a plain
+    AppleScript notification if the notifier app isn't built."""
+    if _NOTIFIER.exists():
+        cmd = ["open", "-g", "-n", str(_NOTIFIER), "--args", "--title", title, "--body", message]
+        for flag, val in (("--subtitle", subtitle), ("--url", url), ("--thread", thread)):
+            if val:
+                cmd += [flag, val]
+        if sound:
+            cmd.append("--sound")
+        subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return
     safe = lambda s: s.replace("\\", "\\\\").replace('"', '\\"')  # noqa: E731
-    script = f'display notification "{safe(message)}" with title "{safe(title)}"' + (' sound name "Basso"' if sound else "")
+    script = f'display notification "{safe(message)}" with title "{safe(title)}"' + (f' subtitle "{safe(subtitle)}"' if subtitle else "") + (' sound name "Basso"' if sound else "")
     subprocess.Popen(["osascript", "-e", script])
 
 

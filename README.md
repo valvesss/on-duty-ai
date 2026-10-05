@@ -32,7 +32,7 @@ Prefer to read the script first? [`install.sh`](install.sh) is short and readabl
 git clone https://github.com/valvesss/on-duty-ai && cd on-duty-ai && ./onduty install
 ```
 
-> Needs macOS and [uv](https://docs.astral.sh/uv/) (the installer gets it for you). When macOS asks, allow **Camera** for *OnDuty*.
+> Needs macOS and [uv](https://docs.astral.sh/uv/) (the installer gets it for you). When macOS asks, allow **Camera** for *OnDuty* and **Notifications** for *on-duty*. For notifications with the on-duty icon the installer builds a tiny helper app with the Xcode Command Line Tools' Swift compiler (`xcode-select --install`); without it you still get plain notifications.
 
 ## What you get
 
@@ -210,7 +210,16 @@ Everything also lives in `~/.on-duty/config.json`.
 
 Your data (events and posture calibration) stays in `~/.on-duty/on-duty.db`, a plain SQLite file. Its schema is versioned (`PRAGMA user_version`) and upgrades itself on start.
 
+## Notifications
+
+Each alert is a real macOS notification from the **on-duty** app (its icon, in *System Settings › Notifications*): the title is the mood (`😇 Gentle`, `😏 Sarcastic`, `😤 Firm`, `🎭 Drama`, `🤪 Chaos`), the subtitle is your name and level, and the body is the line it just said. Clicking one opens the dashboard. You also get `🎯 Focus complete`, `📐 Calibration` (new setup or your posture moved) and `⬆️ Update available`, each only when it matters. Turn them off in Settings. Opening *on-duty* from Spotlight takes you to the dashboard.
+
 ## Troubleshooting
+
+<details><summary><b>Notifications say "Script Editor" or have no icon</b></summary>
+
+The helper app wasn't built. Run `xcode-select --install`, then `./onduty install`, and check `./onduty doctor`. If notifications are built but silent, allow them in *System Settings › Notifications › on-duty*.
+</details>
 
 <details><summary><b>The camera check says "waiting for permission"</b></summary>
 

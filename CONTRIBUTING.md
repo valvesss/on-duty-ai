@@ -49,7 +49,7 @@ The contract (`tests/test_osal.py` checks that every name exists):
 | `mic_in_use() -> bool` | Some app is capturing the microphone (a call) | CoreAudio `DeviceIsRunningSomewhere` | `pactl list source-outputs`; Windows audio session API |
 | `list_voices() -> list[{name, locale}]` | Text-to-speech voices for `pt`/`en` | `say -v ?` | `espeak-ng --voices`, `spd-say`; SAPI voices |
 | `speak(voice, rate, lines) -> Popen-like` | Speak the lines in order, return an object with `.poll()` and `.kill()` | `say` | `espeak-ng`/`spd-say`; PowerShell `System.Speech` |
-| `notify(title, message, sound)` | A desktop notification | `osascript` | `notify-send`; Windows toast |
+| `notify(title, message, subtitle, sound, url, thread)` | A desktop notification; clicking it should open `url` (the dashboard); `thread` groups related ones | a small Swift app, `~/Applications/on-duty.app` (`native/notify.swift`), so macOS shows on-duty's icon and name | `notify-send` (`--action`); Windows toast |
 | `play_alert(volume)` | Short attention sound | `afplay` | `paplay`; `winsound` |
 | `login_item_enabled()` / `set_login_item(bool)` | Start at login on/off, without stopping the running service | `launchctl enable/disable` | systemd `enable/disable`; Startup entry |
 
