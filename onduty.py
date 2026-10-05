@@ -1,4 +1,4 @@
-"""onduty: manage the on-duty service.  ./onduty install | setup | doctor | phrases generate | ..."""
+"""onduty: manage the on-duty service.  ./onduty install | setup | doctor | phrases | ..."""
 
 import argparse
 import json
@@ -50,10 +50,13 @@ def build_app() -> None:
   <key>CFBundleName</key><string>OnDuty</string>
   <key>CFBundleExecutable</key><string>on-duty</string>
   <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleIconFile</key><string>icon</string>
   <key>LSUIElement</key><true/>
   <key>NSCameraUsageDescription</key><string>on-duty watches for you leaving work for your phone. Nothing leaves this machine.</string>
 </dict></plist>
 """)
+    (APP / "Contents/Resources").mkdir()
+    shutil.copy(DIR / "assets/icon.icns", APP / "Contents/Resources/icon.icns")
     launcher = APP / "Contents/MacOS/on-duty"
     launcher.write_text(f"""#!/bin/zsh
 cd "{DIR}"
@@ -172,12 +175,38 @@ def cmd_doctor(_a) -> None:
     check("service installed", PLIST.exists(), "./onduty install")
     check("service running", sh("pgrep", "-f", f"{DIR}/on_duty.py", stdout=subprocess.DEVNULL).returncode == 0,
           f"./onduty logs  (Camera permission for OnDuty?)")
-    check("ANTHROPIC_API_KEY (optional, phrases generate)", bool(os.environ.get("ANTHROPIC_API_KEY")))
+
+
+TEMPLATE = {
+    "levels": [
+        ["Gentle line.", ["Combo line one.", "Combo line two."]],
+        ["Sarcastic line, {time} on the phone."],
+        ["Firm line, {name}."],
+        ["Dramatic line."],
+        ["Absurd chaos line, nag number {n}."],
+    ],
+    "back": {"quick": ["Welcome back."], "medium": ["Welcome back, that was {time}."], "long": ["Finally. {time}."]},
+}
 
 
 def cmd_phrases(a) -> None:
-    sh("uv", "run", "--extra", "ai", "generate_phrases.py", *(["--style", a.style] if a.style else []),
-       cwd=DIR, check=True)
+    if a.action == "template":
+        print(json.dumps(TEMPLATE, indent=2, ensure_ascii=False))
+        return
+    if not config.CUSTOM_PHRASES.exists():
+        sys.exit(f"{config.CUSTOM_PHRASES} not found. See the on-duty-phrases skill or ./onduty phrases template")
+    try:
+        pack = json.loads(config.CUSTOM_PHRASES.read_text())
+        assert len(pack["levels"]) == 5, "levels must have exactly 5 lists"
+        assert all(pack["levels"]), "every level needs at least one line"
+        assert all(pack["back"].get(k) for k in ("quick", "medium", "long")), "back needs quick, medium and long"
+        fmt = {"time": "3 minutes", "n": 1, "name": "X"}
+        for lv in [*pack["levels"], *pack["back"].values()]:
+            for item in lv:
+                [x.format(**fmt) for x in ([item] if isinstance(item, str) else item)]
+    except (KeyError, AssertionError, ValueError, IndexError, json.JSONDecodeError) as e:
+        sys.exit(f"invalid phrases.json: {e!r}")
+    print(f"ok: {sum(map(len, pack['levels']))} lines. ./onduty restart to use them.")
 
 
 def main() -> None:
@@ -193,8 +222,8 @@ def main() -> None:
     s = sub.add_parser("setup", help="set name / language / voice (interactive without flags)")
     s.add_argument("--name"), s.add_argument("--lang", choices=list(config.VOICES)), s.add_argument("--voice")
     s.set_defaults(fn=cmd_setup)
-    ph = sub.add_parser("phrases", help="phrases generate [--style ...] (needs ANTHROPIC_API_KEY)")
-    ph.add_argument("action", choices=["generate"]), ph.add_argument("--style", default="")
+    ph = sub.add_parser("phrases", help="phrases template | validate  (custom pack: ~/.on-duty/phrases.json)")
+    ph.add_argument("action", choices=["template", "validate"])
     ph.set_defaults(fn=cmd_phrases)
     a = p.parse_args()
     a.fn(a)

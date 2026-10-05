@@ -5,7 +5,7 @@ import pathlib
 
 HOME = pathlib.Path.home() / ".on-duty"
 CONFIG_PATH = HOME / "config.json"
-CUSTOM_PHRASES = HOME / "phrases.json"  # optional, written by `onduty phrases generate` or by hand
+CUSTOM_PHRASES = HOME / "phrases.json"  # optional, written by your AI assistant (on-duty-phrases skill) or by hand
 
 VOICES = {"pt_BR": "Luciana", "en_US": "Samantha"}
 

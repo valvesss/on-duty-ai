@@ -11,5 +11,3 @@ dependencies = [
     "ultralytics>=8.3",
 ]
 
-[project.optional-dependencies]
-ai = ["anthropic>=0.60", "pydantic>=2"]

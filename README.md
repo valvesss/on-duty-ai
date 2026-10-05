@@ -7,6 +7,8 @@ to your desk. Everything runs locally on your Mac: no cloud, no LLM at runtime, 
 
 *[Português abaixo](#português)*
 
+<p align="center"><img src="assets/dashboard.png" width="720" alt="Dashboard (camera blurred)"></p>
+
 ## How it works
 
 | Signal | How |
@@ -40,16 +42,18 @@ Allow **Camera** for OnDuty when macOS asks.
 ```
 ./onduty install | uninstall | start | stop | restart | status | logs | stats | db | doctor
 ./onduty setup [--name N] [--lang en_US] [--voice Samantha]
-./onduty phrases generate [--style "drill sergeant who loves football puns"]
+./onduty phrases template | validate
 ```
 
 Settings live in `~/.on-duty/config.json` (name, language, voice, port, camera, thresholds).
 
 ### Personalized phrases (optional)
 
-`./onduty phrases generate` asks Claude to write a pack with your name and chosen style, saved to
-`~/.on-duty/phrases.json` and mixed with the built-in lines (`"custom_phrases_only": true` to use only yours).
-Needs `ANTHROPIC_API_KEY`. The only network call in the project, only when you run it.
+Ask your AI assistant to personalize the lines — in Claude Code, open this repo and say
+"personalize on-duty's phrases"; the `on-duty-phrases` skill (`.claude/skills/`) writes
+`~/.on-duty/phrases.json` for you. Any assistant works: `./onduty phrases template` prints the schema and
+`./onduty phrases validate` checks the result. Built-in lines are mixed in
+(`"custom_phrases_only": true` to use only yours). No API key, no network.
 
 ---
 
@@ -70,7 +74,7 @@ git clone https://github.com/valvesss/on-duty-ai && cd on-duty-ai
 ```
 
 Painel em <http://localhost:7878> (idioma segue a configuração; botão para borrar a câmera).
-`./onduty phrases generate --style "..."` cria frases personalizadas com Claude (opcional, precisa de `ANTHROPIC_API_KEY`).
+Frases personalizadas: peça ao seu assistente de IA (no Claude Code, a skill `on-duty-phrases`) e valide com `./onduty phrases validate`.
 
 ## License
 
