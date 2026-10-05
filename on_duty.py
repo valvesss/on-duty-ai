@@ -33,6 +33,7 @@ import mediapipe as mp
 import numpy as np
 from mediapipe.tasks.python import BaseOptions, vision
 
+import calibration
 import config
 import db
 
@@ -43,7 +44,7 @@ YOLO_MODEL = HERE / "models" / "yolo11n.pt"
 
 STATE: dict = {"status": {}, "jpeg": b"", "events": collections.deque(maxlen=30),
                "series": collections.deque(maxlen=240), "test": False, "blur": False, "said": None, "said_id": 0,
-               "reload": False, "pause_until": 0.0, "preview": None}
+               "reload": False, "pause_until": 0.0, "preview": None, "cmds": collections.deque()}
 
 T = {  # the few strings the engine says outside the phrase packs
     "pt_BR": {"level": "Nível {lv} de 5", "sec": "{n} segundos", "min1": "1 minuto", "min": "{n} minutos"},
@@ -91,7 +92,8 @@ def validate_config(new: dict) -> dict:
         raise ValueError("times must be HH:MM")
     cfg["retention_days"] = max(0, int(cfg["retention_days"]))
     sch["days"] = sorted({int(d) for d in sch["days"] if 1 <= int(d) <= 7})
-    cfg["port"], cfg["camera"] = CFG["port"], CFG["camera"]  # needs a restart; not editable from the page
+    cfg["port"] = CFG["port"]  # needs a restart; not editable from the page
+    cfg["camera"] = max(0, min(9, int(cfg["camera"])))
     return cfg
 
 
@@ -121,6 +123,15 @@ def next_on(now: dt.datetime) -> int:
 _cg = ctypes.CDLL(ctypes.util.find_library("CoreGraphics"))
 _cg.CGMainDisplayID.restype = ctypes.c_uint32
 _cg.CGDisplayIsAsleep.argtypes = [ctypes.c_uint32]
+
+
+_cg.CGGetActiveDisplayList.argtypes = [ctypes.c_uint32, ctypes.POINTER(ctypes.c_uint32), ctypes.POINTER(ctypes.c_uint32)]
+
+
+def display_count() -> int:
+    n, buf = ctypes.c_uint32(0), (ctypes.c_uint32 * 16)()
+    _cg.CGGetActiveDisplayList(16, buf, ctypes.byref(n))
+    return max(1, n.value)
 
 
 def system_asleep() -> bool:
@@ -198,6 +209,8 @@ class Dashboard(BaseHTTPRequestHandler):
                 STATE["pause_until"] = tm.timestamp()
             else:
                 STATE["pause_until"] = time.time() + float(m) * 60 if float(m) > 0 else 0
+        elif self.path == "/api/calibrate":  # start | finish | cancel | reset | discard — handled by the engine loop
+            STATE["cmds"].append(body)
         elif self.path == "/api/say":  # voice preview in the setup wizard
             if STATE["preview"] and STATE["preview"].poll() is None:
                 STATE["preview"].kill()
@@ -305,15 +318,20 @@ class Nagger:
         return self.say(self._pick(tier, self.back[tier]), 0, minutes, kind="back")
 
 
-def head_pose(lm: vision.FaceLandmarker, frame) -> tuple[float, float] | None:
-    """(pitch in degrees, positive = head down; eyeLookDown 0..1) or None without a face."""
+Pose = collections.namedtuple("Pose", "pitch yaw gaze face_h cx")
+
+
+def head_pose(lm: vision.FaceLandmarker, frame) -> Pose | None:
+    """Head pitch (degrees, positive = head down), yaw, eyeLookDown (0..1) and the face box height/centre, or None."""
     r = lm.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)))
     if not r.face_landmarks:
         return None
     R = np.array(r.facial_transformation_matrixes[0])[:3, :3]
     pitch = float(np.degrees(np.arctan2(R[2, 1], R[2, 2])))
+    yaw = float(np.degrees(np.arctan2(-R[2, 0], np.hypot(R[2, 1], R[2, 2]))))
     bs = {c.category_name: c.score for c in r.face_blendshapes[0]}
-    return pitch, (bs["eyeLookDownLeft"] + bs["eyeLookDownRight"]) / 2
+    xs, ys = [p.x for p in r.face_landmarks[0]], [p.y for p in r.face_landmarks[0]]
+    return Pose(pitch, yaw, (bs["eyeLookDownLeft"] + bs["eyeLookDownRight"]) / 2, max(ys) - min(ys), (max(xs) + min(xs)) / 2)
 
 
 def load_yolo(cfg: dict):
@@ -343,7 +361,7 @@ def main() -> None:
     p.add_argument("--debug", action="store_true", help="log signals every 5 s")
     a = p.parse_args()
     CFG.update(config.load())
-    th = CFG["thresholds"]
+    th = CFG["thresholds"]  # (rebuilt below once the personal overrides are known)
     if (gone := db.prune(CFG["retention_days"])):
         log(f"retention: removed {gone} events older than {CFG['retention_days']} days")
 
@@ -363,6 +381,19 @@ def main() -> None:
         work_pitch.extend(calib["pitch"])
         work_gaze.extend(calib["gaze"])
         log(f"calibration restored ({len(work_pitch)} samples)")
+
+    zones: list[dict] = []        # where you look while working, for the current setup (camera + displays)
+    overrides: dict = {}          # personal pitch/gaze deltas measured by the calibration
+    resid: collections.deque[float] = collections.deque(maxlen=int(300 * a.fps))  # typing pitch − zone pitch, ~5 min
+    setup = {"sig": None, "label": "", "state": "never", "created": 0, "displays": 1}
+    drifting, last_sig_check, last_drift_check, bright = False, 0.0, 0.0, 128.0
+    seen_hist: collections.deque[bool] = collections.deque(maxlen=int(120 * a.fps))  # face seen while typing, ~2 min
+    cal = {"zones": [], "phone": None, "last": None}  # an in-progress calibration session
+    cap_ses: dict | None = None
+    cal_until = 0.0  # while > now the calibration page is open: the camera stays on and nothing nags
+    cam_idx, good_cam = CFG["camera"], None
+    eff_th = lambda: {**CFG["thresholds"], **overrides}  # noqa: E731
+    th = eff_th()
 
     nag = Nagger(CFG, not a.no_voice)
     streak_start, n_nags, last_seen_t, last_phone_t = None, 0, time.time(), 0.0
@@ -385,16 +416,60 @@ def main() -> None:
             t0 = time.time()
             if STATE["reload"]:
                 STATE["reload"] = False
-                th = CFG["thresholds"]
+                th = eff_th()
                 nag.shut_up()
                 nag = Nagger(CFG, not a.no_voice)
                 yolo = (yolo or load_yolo(CFG)) if CFG["phone_detection"] else None
                 streak_start, n_nags = None, 0
+                if CFG["camera"] != cam_idx:  # switched camera from the wizard
+                    cam_idx = CFG["camera"]
+                    if cap:
+                        cap.release()
+                        cap = None
                 log(f"config reloaded · tone {CFG['tone']} · voice {nag.voice}")
 
             idle = idle_seconds()
+            while STATE["cmds"]:  # calibration commands from the setup page
+                c = STATE["cmds"].popleft()
+                act = c.get("action")
+                if act == "start":
+                    cal_until = t0 + 600
+                    if mode == "active" and cap is not None and cap_ses is None:
+                        cap_ses = calibration.CaptureSession(c.get("kind", "zone"), str(c.get("name", ""))[:30], float(c.get("seconds", 8)), t0)
+                        streak_start, n_nags = None, 0
+                        nag.shut_up()
+                    else:
+                        cal["last"] = {"kind": c.get("kind"), "ok": False, "error": "camera"}
+                elif act == "cancel":
+                    cap_ses, cal, cal_until = None, {"zones": [], "phone": None, "last": None}, 0.0
+                elif act == "discard" and 0 <= int(c.get("index", -1)) < len(cal["zones"]):
+                    cal["zones"].pop(int(c["index"]))
+                elif act == "unphone":
+                    cal["phone"] = None
+                elif act == "reset" and setup["sig"]:
+                    db.delete(f"setup:{setup['sig']}")
+                    zones, overrides, th = [], {}, eff_th()
+                    setup.update(state="new_setup" if db.keys("setup:") else "never", label="")
+                    resid.clear()
+                    drifting = False
+                    log("calibration cleared for this setup")
+                elif act == "finish" and cal["zones"] and setup["sig"]:
+                    derived = calibration.derive_thresholds(cal["zones"], cal["phone"], c.get("sensitivity", "normal"))
+                    label = calibration.setup_label(setup["displays"], CFG["camera"])
+                    db.put(f"setup:{setup['sig']}", {"label": label, "zones": cal["zones"], "thresholds": derived, "phone": cal["phone"],
+                                                     "sensitivity": c.get("sensitivity", "normal"), "created": int(time.time())})
+                    zones, overrides = list(cal["zones"]), derived
+                    th = eff_th()
+                    setup.update(state="ok", label=label, created=int(time.time()))
+                    resid.clear()
+                    drifting = False
+                    log(f"calibrated {label}: {len(zones)} zone(s), thresholds {derived or 'default'}")
+                    cap_ses, cal, cal_until = None, {"zones": [], "phone": None, "last": None}, 0.0
+            calibrating = cal_until > t0
             if system_asleep():
                 new_mode, why = "asleep", "screen"
+            elif calibrating:
+                new_mode, why = "active", ""
             elif STATE["pause_until"] > t0:
                 new_mode, why = "paused", ""
             elif CFG["onboarded"] and not work_window(dt.datetime.now())[0]:
@@ -435,6 +510,12 @@ def main() -> None:
                 cap = cv2.VideoCapture(CFG["camera"])
                 if not cap.isOpened():
                     cap = None
+                    if good_cam is not None and CFG["camera"] != good_cam:  # tried another camera and it isn't there
+                        log(f"no camera at index {CFG['camera']}, back to {good_cam}")
+                        CFG["camera"] = cam_idx = good_cam
+                        config.save(CFG)
+                        STATE["camera_note"] = int(t0)
+                        continue
                     if camera_ok is not None:
                         log("Camera didn't open: allow OnDuty in System Settings › Privacy & Security › Camera.")
                     camera_ok = None
@@ -447,6 +528,28 @@ def main() -> None:
                 time.sleep(1)
                 continue
             camera_ok = True
+            good_cam = CFG["camera"]
+            bright += 0.2 * (float(cv2.cvtColor(frame[::8, ::8], cv2.COLOR_BGR2GRAY).mean()) - bright)
+
+            if t0 - last_sig_check >= 10:  # which physical setup is this? (camera + displays + resolution)
+                last_sig_check = t0
+                sig = calibration.setup_signature(CFG["camera"], display_count(), frame.shape[1], frame.shape[0])
+                if sig != setup["sig"]:
+                    first = setup["sig"] is None
+                    prof, _ = db.get(f"setup:{sig}")
+                    setup.update(sig=sig, displays=display_count(), label=prof["label"] if prof else "", created=prof["created"] if prof else 0,
+                                 state="ok" if prof else ("new_setup" if db.keys("setup:") else "never"))
+                    zones, overrides = (prof["zones"], prof.get("thresholds", {})) if prof else ([], {})
+                    th = eff_th()
+                    resid.clear()
+                    drifting = False
+                    if first and calib and calib.get("sig", sig) != sig:
+                        work_pitch.clear()
+                        work_gaze.clear()
+                    elif not first:  # moved to another desk/monitor: the old rolling posture no longer applies
+                        work_pitch.clear()
+                        work_gaze.clear()
+                    log(f"setup {sig}: " + (f"calibrated ({len(zones)} zone(s))" if prof else f"not calibrated ({setup['state']})"))
 
             pose = head_pose(lm, frame)
             phone_boxes = []
@@ -459,15 +562,24 @@ def main() -> None:
             phone_hist.append(bool(phone_boxes))
             recent_phone.append(bool(phone_boxes))
 
-            base = statistics.median(work_pitch) if len(work_pitch) >= 10 else None
-            gbase = statistics.median(work_gaze) if work_gaze else 0.5
+            zone = calibration.nearest_zone(zones, pose.yaw) if pose and zones else None
+            if zone:  # calibrated: compare against the zone you're facing, plus slow slouch drift
+                drift = calibration.clamp_drift(statistics.median(resid)) if len(resid) >= 20 else 0.0
+                base, gbase = zone["pitch"] + drift, zone["gaze"]
+            else:  # not calibrated: learn your posture while you type
+                base = statistics.median(work_pitch) if len(work_pitch) >= 10 else None
+                gbase = statistics.median(work_gaze) if work_gaze else 0.5
             dpitch = gaze = None
+            if idle < 3:
+                seen_hist.append(bool(pose))
             if pose:
-                pitch, gaze = pose
+                pitch, gaze = pose.pitch, pose.gaze
                 last_face_t = t0
                 if idle < 3:  # typing/using the mouse: this is the working posture
                     work_pitch.append(pitch)
                     work_gaze.append(gaze)
+                    if zone:
+                        resid.append(pitch - zone["pitch"])
                 dpitch = pitch - base if base is not None else 0.0
                 face_down = base is not None and (dpitch > th["pitch_delta"] or gaze - gbase > th["gaze_delta"])
                 last_down = face_down
@@ -490,7 +602,7 @@ def main() -> None:
                 log(f"✅ back ({mins:.1f} min on the phone, {n_nags} lines) {said}")
                 db.record("back", start=int(streak_start), minutes=round(mins, 2), n=n_nags, said=said)
                 streak_start, n_nags = None, 0
-            elif CFG["onboarded"] and (phone_now or face_now) and not streak_start:  # the wizard never nags
+            elif CFG["onboarded"] and not calibrating and (phone_now or face_now) and not streak_start:  # the wizard never nags
                 streak_start = now - (2 if phone_now else th["window"] * th["down_ratio"])
             if streak_start and now - last_seen_t < 20 and nag.ready(n_nags + 1):
                 # keeps talking until you're back (pauses if you walked away from the camera)
@@ -500,20 +612,45 @@ def main() -> None:
                 log(f"📵 line #{n_nags} level {nag.level(n_nags) + 1} via {cause}: {said}")
                 db.record("alert", n=n_nags, cause=cause, level=nag.level(n_nags) + 1, said=said)
 
+            if zones and t0 - last_drift_check >= 30 and len(resid) >= int(120 * a.fps):
+                last_drift_check = t0
+                was = drifting
+                drifting = calibration.drift_state(drifting, statistics.median(resid))
+                if drifting != was:
+                    log(f"posture drift {'detected' if drifting else 'cleared'} (median {statistics.median(resid):+.1f}°)")
             if STATE["test"]:
                 STATE["test"] = False
                 lv = random.randrange(nag.tone["start"], nag.tone["cap"] + 1)
                 log(f"📵 test (level {lv + 1}): {nag.say(random.choice(nag.levels[lv]), lv, 3, 7, kind='test')}")
             if now - last_save >= 60 and work_pitch:  # persist posture so restarts don't recalibrate
                 last_save = now
-                db.put("calibration", {"pitch": list(work_pitch)[-300:], "gaze": list(work_gaze)[-300:]})
+                db.put("calibration", {"pitch": list(work_pitch)[-300:], "gaze": list(work_gaze)[-300:], "sig": setup["sig"]})
             if a.debug and now - last_dbg >= 5:
                 last_dbg = now
                 log(f"face={'y' if pose else 'n'} dpitch={dpitch if dpitch is None else round(dpitch, 1)} "
                     f"gaze={gaze if gaze is None else round(gaze, 2)} base={base if base is None else round(base, 1)} "
                     f"phone={'y' if phone_boxes else 'n'} down={ratio:.0%} idle={idle:.0f}s")
 
+            cal_live = None
+            if cap_ses:
+                cap_ses.add((pose.pitch, pose.yaw, pose.gaze) if pose else None, bright, pose.face_h if pose else 0.0, pose.cx if pose else 0.5)
+                cal_live = cap_ses.live(now)
+                if cap_ses.done(now):
+                    res = cap_ses.result()
+                    if res["ok"] and res["kind"] == "zone":
+                        cal["zones"].append({"name": res["name"] or f"Zone {len(cal['zones']) + 1}", **res["summary"]})
+                    elif res["ok"]:
+                        cal["phone"] = res["summary"]
+                    cal["last"] = res
+                    log(f"calibration {res['kind']} '{res['name']}': {res['summary'] or res['error']}")
+                    cap_ses, cal_live = None, None
+            health = [h for h, bad in (("dark", bright < 45), ("blocked", len(seen_hist) >= int(60 * a.fps) and sum(seen_hist) / len(seen_hist) < 0.4)) if bad]
+            state = "drift" if drifting else setup["state"]
             STATE["status"] = {
+                "calibration": {"state": state, "label": setup["label"], "zones": [z["name"] for z in zones], "displays": setup["displays"],
+                                "created": setup["created"], "thresholds": overrides, "camera": CFG["camera"]},
+                "cal": {"open": calibrating, "live": cal_live, "zones": cal["zones"], "phone": cal["phone"], "last": cal["last"]},
+                "health": health, "camera_note": STATE.get("camera_note", 0),
                 "t": int(now), "mode": "active", "mode_why": "", "resume_at": 0, "camera_ok": True, "onboarded": CFG["onboarded"],
                 "name": CFG["name"], "lang": CFG["lang"], "face": bool(pose),
                 "dpitch": dpitch, "gaze": gaze, "gaze_base": gbase, "down": down, "face_down": face_down,
@@ -535,7 +672,7 @@ def main() -> None:
                 small = cv2.resize(cv2.GaussianBlur(cv2.resize(small, (24, 18), interpolation=cv2.INTER_AREA), (0, 0), 2), (w, h), interpolation=cv2.INTER_CUBIC)
             STATE["jpeg"] = cv2.imencode(".jpg", small, [cv2.IMWRITE_JPEG_QUALITY, 70])[1].tobytes()
 
-            time.sleep(max(0, 1 / a.fps - (time.time() - t0)))
+            time.sleep(max(0, 1 / (6.0 if cap_ses else a.fps) - (time.time() - t0)))
     except KeyboardInterrupt:
         pass
     finally:

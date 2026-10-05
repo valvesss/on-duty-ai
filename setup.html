@@ -127,6 +127,17 @@ const S = {
     h_done:name=>name ? `All set, ${name}.` : 'All set.', p_done:'From here on I keep an eye on you during your work hours. Want to hear me?',
     test:'Test a scolding', ai_h:'Want lines that sound like you?', ai_p:'Open Claude Code (or any AI assistant) in the on-duty folder and say:',
     ai_prompt:'Personalize on-duty’s phrases for me.', copy:'Copy', copied:'Copied!', dash:'Open my dashboard',
+    cal_h:'Let’s calibrate', cal_p:'About 40 seconds. I learn where you look while working and how you look when you grab your phone, so I only nag when it’s real.',
+    cal_again:'Do it again whenever you move the laptop, plug in a monitor or switch cameras.', cal_setup:l=>`This setup: ${l}`, cal_start:'Start', cal_skip:'Skip (I’ll learn as you type)',
+    cal_zone_h:n=>n ? 'Another place you look at' : 'Look at your main screen', cal_zone_p:'Work or read like you normally do and hold still for a few seconds. Name this spot:',
+    presets:['Main screen','Second monitor','Keyboard / notes','Laptop screen'], cal_ready:'Ready', cal_hold:'Hold still, work normally…',
+    q:{no_face:'I can’t see your face',dark:'Too dark: add some light',bright:'Too bright or backlit',far:'Move a bit closer',close:'A bit too close',off_center:'Center yourself in the frame',moving:'Try to stay steady'},
+    cal_err:{no_face:'I barely saw your face. Check the light and camera, then retry.',moving:'You moved around too much. Retry and stay steady.',camera:'The camera isn’t available right now.'}, cal_retry:'Retry',
+    cal_more_h:'Do you look somewhere else while working?', cal_more_p:'Another monitor, a notebook, a second laptop… add it so looking there never counts as scrolling.', cal_add:'Add another place', cal_nomore:'That’s all',
+    cal_phone_h:'Now grab your phone', cal_phone_p:'Hold it the way you do when you doomscroll and look at it for a few seconds.', cal_phone_btn:'I’m holding it', cal_phone_skip:'Skip (default sensitivity)',
+    cal_rev_h:'Here’s what I learned', cal_zone_line:z=>`${z.name} · head ${z.pitch > 0 ? '+' : ''}${z.pitch}°, turned ${z.yaw > 0 ? '+' : ''}${z.yaw}°`, cal_phone_line:(p,d)=>d.pitch_delta ? `With the phone your head drops about ${p}°, so I’ll flag you at +${d.pitch_delta}°.` : 'Your head barely moves with the phone, so I’ll rely on the phone detector and your gaze.',
+    cal_no_phone:'No phone sample: using default sensitivity.', cal_sens:'How strict?', sens:{relaxed:'Relaxed',normal:'Normal',strict:'Strict'}, cal_save:'Save calibration',
+    cal_try_h:'Try it', cal_try_p:'Look down at your phone, then back at the screen. The light should follow you.', cal_down:'Looking down', cal_up:'Working', cal_fin:'Done', cal_dash:'Back to the dashboard', cal_discard:'Remove', switch_cam:'Switch camera', cam_none:'No other camera found.',
     err:'Could not save — is the service running?'},
   pt: {
     start:'Bora', next:'Continuar', back:'Voltar', skip:'Pular', finish:'Abrir meu painel', saving:'Salvando…',
@@ -147,12 +158,23 @@ const S = {
     h_done:name=>name ? `Tudo pronto, ${name}.` : 'Tudo pronto.', p_done:'A partir de agora eu fico de olho em você no seu horário de trabalho. Quer me ouvir?',
     test:'Testar uma bronca', ai_h:'Quer frases com a sua cara?', ai_p:'Abra o Claude Code (ou qualquer assistente de IA) na pasta do on-duty e diga:',
     ai_prompt:'Personalize as frases do on-duty pra mim.', copy:'Copiar', copied:'Copiado!', dash:'Abrir meu painel',
+    cal_h:'Vamos calibrar', cal_p:'Cerca de 40 segundos. Eu aprendo onde você olha enquanto trabalha e como fica quando pega o celular, pra só dar bronca quando for de verdade.',
+    cal_again:'Refaça sempre que mudar o notebook de lugar, plugar um monitor ou trocar de câmera.', cal_setup:l=>`Este setup: ${l}`, cal_start:'Começar', cal_skip:'Pular (aprendo enquanto você digita)',
+    cal_zone_h:n=>n ? 'Outro lugar pra onde você olha' : 'Olhe pra sua tela principal', cal_zone_p:'Trabalhe ou leia como de costume e fique firme por alguns segundos. Dê um nome a esse ponto:',
+    presets:['Tela principal','Segundo monitor','Teclado / anotações','Tela do notebook'], cal_ready:'Pronto', cal_hold:'Fique firme, trabalhe normalmente…',
+    q:{no_face:'Não estou vendo seu rosto',dark:'Muito escuro: acenda uma luz',bright:'Muito claro ou contraluz',far:'Chegue um pouco mais perto',close:'Um pouco perto demais',off_center:'Centralize-se no quadro',moving:'Tente ficar firme'},
+    cal_err:{no_face:'Quase não vi seu rosto. Confira luz e câmera e tente de novo.',moving:'Você se mexeu demais. Tente de novo, firme.',camera:'A câmera não está disponível agora.'}, cal_retry:'Tentar de novo',
+    cal_more_h:'Você olha pra outro lugar enquanto trabalha?', cal_more_p:'Outro monitor, um caderno, um segundo notebook… adicione pra olhar ali nunca contar como rolagem.', cal_add:'Adicionar outro lugar', cal_nomore:'É só isso',
+    cal_phone_h:'Agora pegue o celular', cal_phone_p:'Segure do jeito que você segura pra rolar o feed e olhe pra ele por alguns segundos.', cal_phone_btn:'Estou segurando', cal_phone_skip:'Pular (sensibilidade padrão)',
+    cal_rev_h:'Foi isso que aprendi', cal_zone_line:z=>`${z.name} · cabeça ${z.pitch > 0 ? '+' : ''}${z.pitch}°, virada ${z.yaw > 0 ? '+' : ''}${z.yaw}°`, cal_phone_line:(p,d)=>d.pitch_delta ? `Com o celular sua cabeça cai uns ${p}°, então aviso a partir de +${d.pitch_delta}°.` : 'Sua cabeça quase não se mexe com o celular, então confio no detector de celular e no olhar.',
+    cal_no_phone:'Sem amostra do celular: sensibilidade padrão.', cal_sens:'Quão rigoroso?', sens:{relaxed:'Relaxado',normal:'Normal',strict:'Rigoroso'}, cal_save:'Salvar calibração',
+    cal_try_h:'Teste agora', cal_try_p:'Olhe pro celular e depois pra tela. A luz acompanha você.', cal_down:'Olhando pra baixo', cal_up:'Trabalhando', cal_fin:'Pronto', cal_dash:'Voltar ao painel', cal_discard:'Remover', switch_cam:'Trocar de câmera', cam_none:'Não achei outra câmera.',
     err:'Não consegui salvar — o serviço está rodando?'},
 };
-const PAL = [['#0f766e','#2563eb'],['#7c3aed','#db2777'],['#ea580c','#e11d48'],['#0369a1','#0f766e'],['#4338ca','#7c3aed'],['#0f766e','#22c55e'],['#be123c','#7e22ce']];
+const PAL = [['#0f766e','#2563eb'],['#7c3aed','#db2777'],['#ea580c','#e11d48'],['#0369a1','#0f766e'],['#4338ca','#7c3aed'],['#0f766e','#22c55e'],['#0e7490','#4f46e5'],['#be123c','#7e22ce']];
 let cfg = null, voices = [], step = 0, ui = (navigator.language || '').startsWith('pt') ? 'pt' : 'en', maxStep = 0, camTimer = null, lastSaid = 0;
 const t = k => S[ui][k];
-const STEPS = ['welcome', 'name', 'tone', 'when', 'voice', 'cam', 'done'];
+const STEPS = ['welcome', 'name', 'tone', 'when', 'voice', 'cam', 'calibrate', 'done'];
 
 /* ---------- mascot ---------- */
 const FACE = { happy:[0,-2,0,0,'M75 108 Q100 128 125 108'], wow:[0,-4,-10,-5,'M82 112 Q100 134 118 112 Z'], think:[10,-6,10,-3,'M78 114 L122 114'], cool:[0,2,14,0,'M70 112 Q100 120 130 106'], party:[0,-2,-12,-6,'M68 106 Q100 140 132 106 Z'] };
@@ -244,7 +266,8 @@ const R = {
       <div class="checks"><div class="check" id="k1"><span class="tick">✓</span><div>${t('c_cam')}<small id="k1s"></small></div></div>
       <div class="check" id="k2"><span class="tick">✓</span><div>${t('c_face')}<small id="k2s"></small></div></div>
       <div class="check" id="k3"><span class="tick">✓</span><div>${t('c_phone')}<small id="k3s"></small></div></div></div>
-      <div class="switch ${cfg.phone_detection ? 'on' : ''}" id="pd" style="margin-top:16px"><i></i>${t('phone_det')}</div>${nav()}`; bindNav();
+      <div class="row" style="margin-top:16px"><div class="switch ${cfg.phone_detection ? 'on' : ''}" id="pd" style="margin:0"><i></i>${t('phone_det')}</div><button class="chip" id="swc">📷 ${t('switch_cam')}</button></div><div class="hint" id="cnote" style="opacity:.85;margin-top:8px"></div>${nav()}`; bindNav();
+    $('swc').onclick = switchCam;
     $('pd').onclick = async () => { const on = !cfg.phone_detection; $('pd').classList.toggle('on', on); await save({phone_detection:on}); };
     let phoneSeen = false;
     const poll = async () => { try { const s = await (await fetch('/status')).json(); $('cimg').src = '/frame.jpg?' + Date.now();
@@ -266,6 +289,76 @@ const R = {
       for (let i = 0; i < 12; i++) { await new Promise(r => setTimeout(r, 400)); const s = await (await fetch('/status')).json(); if (s.said && s.said.id !== lastSaid && s.said.kind === 'test') { lastSaid = s.said.id; live.textContent = s.said.text; face('wow'); break; } } };
     fetch('/status').then(r => r.json()).then(s => { lastSaid = s.said ? s.said.id : 0; }); },
 };
+
+async function switchCam() {
+  const before = (await (await fetch('/status')).json()).camera_note || 0, next = (cfg.camera + 1) % 4;
+  await save({camera:next}); await new Promise(r => setTimeout(r, 3500));
+  const s = await (await fetch('/status')).json();
+  if ((s.camera_note || 0) !== before) { const j = await (await fetch('/api/config')).json(); cfg.camera = j.config.camera; const n = $('cnote'); if (n) { n.textContent = t('cam_none'); setTimeout(() => n.textContent = '', 3000); } }
+}
+const cal = (body) => api('/api/calibrate', body);
+let cs = {phase:'intro', name:'', before:0, sens:'normal', result:null};
+Object.assign(R, { calibrate(p) { face('think'); cs = {phase:'intro', name:'', before:0, sens:'normal', result:null}; renderCal(p); } });
+function renderCal(p) {
+  p = p || $('panel'); clearInterval(camTimer);
+  const q = new URLSearchParams(location.search).has('calibrate');
+  const fin = q ? () => { location.href = '/'; } : () => go(step + 1);
+  const finLabel = q ? t('cal_dash') : t('next');
+  const camBox = `<div class="cam"><img id="cimg" alt=""></div>`;
+  const keepCam = () => { const tick = async () => { const i = $('cimg'); if (i) i.src = '/frame.jpg?' + Date.now(); }; tick(); camTimer = setInterval(tick, 500); };
+  const chipsQ = iss => iss.map(c => `<span class="chip on" style="background:#fbbf24;color:#422006">${t('q')[c]}</span>`).join(' ');
+  const P = cs.phase;
+  if (P === 'intro') {
+    fetch('/status').then(r => r.json()).then(s => { const el = $('setupnow'); if (el && s.calibration) el.textContent = s.calibration.label ? t('cal_setup')(s.calibration.label) : t('cal_setup')(`${s.calibration.displays} display${s.calibration.displays > 1 ? 's' : ''} · camera ${s.calibration.camera}`); });
+    p.innerHTML = `<h1>${t('cal_h')}</h1><p class="sub">${t('cal_p')}</p><div class="summary" id="setupnow" style="margin:0 0 8px"></div><p class="sub" style="font-size:15px;opacity:.8">${t('cal_again')}</p>
+      <div class="nav">${step > 0 && !q ? `<button class="btn ghost" id="bk">${t('back')}</button>` : ''}<button class="btn main" id="go">${t('cal_start')}</button><button class="btn ghost" id="sk">${q ? t('cal_dash') : t('cal_skip')}</button></div>`;
+    if ($('bk')) $('bk').onclick = () => go(step - 1); $('sk').onclick = fin;
+    $('go').onclick = async () => { await cal({action:'cancel'}); cs = {phase:'zone', name:t('presets')[0], before:0, sens:'normal', result:null}; renderCal(); };
+  } else if (P === 'zone' || P === 'phone') {
+    const isZone = P === 'zone';
+    p.innerHTML = isZone
+      ? `<h1>${t('cal_zone_h')(cs.zones0)}</h1><p class="sub">${t('cal_zone_p')}</p><div class="chips" id="pre">${t('presets').map(n => `<button class="chip ${n === cs.name ? 'on' : ''}" data-n="${n}">${n}</button>`).join('')}</div>${camBox}<div class="checks" id="qc" style="min-height:44px"></div><div class="err" id="err" style="display:none"></div>
+         <div class="nav"><button class="btn main" id="go">${t('cal_ready')}</button><button class="btn ghost" id="swc">📷 ${t('switch_cam')}</button></div>`
+      : `<h1>${t('cal_phone_h')}</h1><p class="sub">${t('cal_phone_p')}</p>${camBox}<div class="checks" id="qc" style="min-height:44px"></div><div class="err" id="err" style="display:none"></div>
+         <div class="nav"><button class="btn main" id="go">${t('cal_phone_btn')}</button><button class="btn ghost" id="sk">${t('cal_phone_skip')}</button></div>`;
+    keepCam(); face(isZone ? 'happy' : 'think');
+    if (isZone) { p.querySelectorAll('[data-n]').forEach(b => b.onclick = () => { cs.name = b.dataset.n; p.querySelectorAll('[data-n]').forEach(x => x.classList.toggle('on', x === b)); }); $('swc').onclick = switchCam; }
+    else $('sk').onclick = () => { cs.phase = 'review'; renderCal(); };
+    $('go').onclick = async () => {
+      const zonesBefore = (await (await fetch('/status')).json()).cal.zones.length; $('go').disabled = true; $('err').style.display = 'none';
+      await cal({action:'start', kind:isZone ? 'zone' : 'phone', name:isZone ? cs.name : 'phone', seconds:isZone ? 8 : 7});
+      const started = Date.now(); face('wow');
+      const poll = setInterval(async () => { const s = await (await fetch('/status')).json(); const live = s.cal.live;
+        if (live) { $('qc').innerHTML = `<div class="check ${live.quality.ok ? 'ok' : ''}"><span class="tick">${Math.round(live.progress * 100)}%</span><div>${live.quality.ok ? t('cal_hold') : chipsQ(live.quality.issues)}</div></div><div style="height:8px;background:#fff3;border-radius:4px;overflow:hidden"><div style="height:100%;width:${live.progress * 100}%;background:#fff"></div></div>`; }
+        else if (Date.now() - started > 1500) { clearInterval(poll); const last = s.cal.last;
+          if (last && last.ok) { if (isZone) { cs.phase = 'more'; } else { cs.phase = 'review'; } renderCal(); }
+          else { $('go').disabled = false; $('go').textContent = t('cal_retry'); $('err').style.display = 'block'; $('err').textContent = t('cal_err')[(last && last.error) || 'camera']; $('qc').innerHTML = ''; face('think'); } } }, 300); };
+  } else if (P === 'more') {
+    face('happy'); p.innerHTML = `<h1>${t('cal_more_h')}</h1><p class="sub">${t('cal_more_p')}</p>
+      <div class="nav"><button class="btn main" id="add">${t('cal_add')}</button><button class="btn ghost" id="no">${t('cal_nomore')}</button></div>`;
+    $('add').onclick = () => { cs.zones0 = 1; cs.name = t('presets')[1]; cs.phase = 'zone'; renderCal(); };
+    $('no').onclick = () => { cs.phase = 'phone'; renderCal(); };
+  } else if (P === 'review') {
+    face('cool'); fetch('/status').then(r => r.json()).then(s => {
+      const zs = s.cal.zones, ph = s.cal.phone, ref = zs.length ? zs.reduce((a, z) => a + z.pitch, 0) / zs.length : 0, dp = ph ? Math.round(ph.pitch - ref) : 0;
+      const derived = ph && dp >= 4 ? {pitch_delta:Math.round(Math.min(20, Math.max(5, dp * .5)) * 10) / 10} : {};
+      p.innerHTML = `<h1>${t('cal_rev_h')}</h1><div class="checks" style="max-width:520px">${zs.map((z, i) => `<div class="check ok"><span class="tick">✓</span><div>${t('cal_zone_line')(z)}</div><button class="chip" data-d="${i}" style="margin-left:auto">${t('cal_discard')}</button></div>`).join('')}
+        <div class="check ${ph ? 'ok' : ''}"><span class="tick">${ph ? '✓' : '–'}</span><div>${ph ? t('cal_phone_line')(dp, derived) : t('cal_no_phone')}</div></div></div>
+        <div class="field" style="margin-top:18px"><label>${t('cal_sens')}</label><div class="chips">${['relaxed', 'normal', 'strict'].map(k => `<button class="chip ${cs.sens === k ? 'on' : ''}" data-s="${k}">${t('sens')[k]}</button>`).join('')}</div></div>
+        <div class="nav"><button class="btn main" id="sv" ${zs.length ? '' : 'disabled'}>${t('cal_save')}</button><button class="btn ghost" id="again">${t('cal_retry')}</button></div>`;
+      p.querySelectorAll('[data-s]').forEach(b => b.onclick = () => { cs.sens = b.dataset.s; p.querySelectorAll('[data-s]').forEach(x => x.classList.toggle('on', x === b)); });
+      p.querySelectorAll('[data-d]').forEach(b => b.onclick = async () => { await cal({action:'discard', index:+b.dataset.d}); renderCal(); });
+      $('again').onclick = async () => { await cal({action:'cancel'}); cs = {phase:'zone', name:t('presets')[0], before:0, sens:cs.sens, result:null}; renderCal(); };
+      $('sv').onclick = async () => { await cal({action:'finish', sensitivity:cs.sens}); confetti(); cs.phase = 'try'; renderCal(); }; });
+  } else if (P === 'try') {
+    face('cool'); p.innerHTML = `<h1>${t('cal_try_h')}</h1><p class="sub">${t('cal_try_p')}</p>${camBox}
+      <div class="live" id="lamp" style="max-width:340px;text-align:center;margin-top:14px"></div>
+      <div class="nav"><button class="btn main" id="ok">${q ? t('cal_dash') : t('cal_fin')}</button></div>`;
+    $('ok').onclick = () => { cs.phase = 'intro'; fin(); };
+    keepCam(); const lamp = async () => { try { const s = await (await fetch('/status')).json(); const dn = s.down || s.phone; const l = $('lamp'); if (!l) return; l.textContent = (dn ? '🔴 ' + t('cal_down') : '🟢 ' + t('cal_up')); l.style.background = dn ? '#fecaca' : '#bbf7d0'; face(dn ? 'wow' : 'cool'); } catch {} };
+    lamp(); const lt = setInterval(() => { if (!$('lamp')) return clearInterval(lt); lamp(); }, 500);
+  }
+}
 addEventListener('keydown', e => { if (e.key === 'Enter' && !e.target.matches('button') && $('nx') && !$('nx').disabled) $('nx').click(); });
 $('langBtn').onclick = async () => { ui = ui === 'pt' ? 'en' : 'pt'; await save({lang:ui === 'pt' ? 'pt_BR' : 'en_US', voice:''}); render(); };
 
@@ -274,7 +367,7 @@ $('langBtn').onclick = async () => { ui = ui === 'pt' ? 'en' : 'pt'; await save(
   if (!cfg.onboarded) ui = (navigator.language || '').startsWith('pt') ? 'pt' : 'en'; else ui = lang();
   if (!cfg.onboarded && cfg.lang !== (ui === 'pt' ? 'pt_BR' : 'en_US')) await save({lang:ui === 'pt' ? 'pt_BR' : 'en_US'});
   const q = new URLSearchParams(location.search);
-  step = q.has('step') ? +q.get('step') : cfg.onboarded && q.has('edit') ? 1 : 0; maxStep = cfg.onboarded ? STEPS.length - 1 : 0; render();
+  step = q.has('calibrate') ? STEPS.indexOf('calibrate') : q.has('step') ? +q.get('step') : cfg.onboarded && q.has('edit') ? 1 : 0; maxStep = cfg.onboarded ? STEPS.length - 1 : 0; render();
 })();
 </script>
 </body>

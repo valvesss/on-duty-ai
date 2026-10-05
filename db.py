@@ -99,3 +99,13 @@ def put(key: str, value) -> None:
     with _lock:
         con().execute("INSERT INTO profile VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, "
                       "updated=excluded.updated", (key, json.dumps(value), int(time.time())))
+
+
+def keys(prefix: str) -> list[str]:
+    with _lock:
+        return [r[0] for r in con().execute("SELECT key FROM profile WHERE key LIKE ? ESCAPE '\\'", (prefix.replace("%", "\\%") + "%",))]
+
+
+def delete(key: str) -> None:
+    with _lock:
+        con().execute("DELETE FROM profile WHERE key=?", (key,))

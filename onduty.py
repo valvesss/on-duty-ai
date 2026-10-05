@@ -142,6 +142,14 @@ def cmd_open(_a) -> None:
     sh("open", f"http://localhost:{config.load()['port']}")
 
 
+def cmd_recalibrate(_a) -> None:
+    sh("open", f"http://localhost:{config.load()['port']}/setup?calibrate")
+
+
+def cmd_test(_a) -> None:
+    sh(sys.executable, "-m", "unittest", "discover", "-s", "tests", cwd=DIR, check=True)
+
+
 def cmd_pause(a) -> None:
     body = json.dumps({"minutes": "tomorrow" if a.minutes == "tomorrow" else float(a.minutes)}).encode()
     req = urllib.request.Request(f"http://localhost:{config.load()['port']}/api/pause", body, {"Content-Type": "application/json"})
@@ -202,6 +210,11 @@ def cmd_doctor(_a) -> None:
     for name in MODELS:
         check(f"model {name}", (DIR / "models" / name).exists(), "./onduty install")
     check("service installed", PLIST.exists(), "./onduty install")
+    try:
+        cal = json.loads(urllib.request.urlopen(f"http://localhost:{config.load()['port']}/status", timeout=2).read()).get("calibration", {})
+        check(f"calibrated for this setup ({cal.get('label') or cal.get('state')})", cal.get("state") == "ok", "./onduty recalibrate")
+    except OSError:
+        pass
     check("service running", sh("pgrep", "-f", f"{DIR}/on_duty.py", stdout=subprocess.DEVNULL).returncode == 0,
           f"./onduty logs  (Camera permission for OnDuty?)")
 
@@ -260,6 +273,8 @@ def main() -> None:
                         ("doctor", cmd_doctor, "check the setup")]:
         sub.add_parser(name, help=h).set_defaults(fn=fn)
     sub.add_parser("open", help="open the dashboard").set_defaults(fn=cmd_open)
+    sub.add_parser("recalibrate", help="recalibrate for this desk / monitors / camera").set_defaults(fn=cmd_recalibrate)
+    sub.add_parser("test", help="run the unit tests").set_defaults(fn=cmd_test)
     pz = sub.add_parser("pause", help="pause: <minutes> | tomorrow | 0 (resume)")
     pz.add_argument("minutes"), pz.set_defaults(fn=cmd_pause)
     s = sub.add_parser("setup", help="open the setup wizard (or set --name/--lang/--voice directly)")

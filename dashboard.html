@@ -23,6 +23,9 @@
   header h1 { margin:0; font-size:20px; letter-spacing:-.02em }
   .pill { font-size:12px; font-weight:700; padding:4px 10px; border-radius:99px; color:#fff; background:var(--mute); text-transform:uppercase; letter-spacing:.04em }
   header .sp { flex:1 }
+  .banner { display:flex; gap:12px; align-items:center; background:#fef3c7; color:#422006; border:1px solid #f59e0b55; border-radius:14px; padding:10px 14px; font-weight:600 }
+  .banner a { background:#422006; color:#fef3c7; text-decoration:none; border-radius:99px; padding:6px 14px; font-weight:800; font-size:14px; white-space:nowrap }
+  .banner button { margin-left:auto; border:0; background:transparent; font-size:20px; padding:0 4px; color:inherit; box-shadow:none }
   .gear { text-decoration:none; color:var(--fg); border:1px solid var(--line); background:var(--card); border-radius:99px; padding:6px 12px; font-size:17px; line-height:1.2 }
   .menuwrap { position:relative } .menu { position:absolute; right:0; top:110%; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:6px; display:none; z-index:30; box-shadow:0 10px 30px #0004; min-width:170px }
   .menu.on { display:grid; gap:4px } .menu button { border:0; text-align:left; border-radius:10px }
@@ -143,6 +146,8 @@
     <a href="/setup?edit" class="gear" title="Settings" aria-label="Settings">⚙</a><button id="photo" data-i="photo"></button>
   </header>
 
+  <div class="banner" id="banner" style="display:none"><span id="bmsg"></span><a href="/setup?calibrate" id="bgo"></a><button id="bx" aria-label="Dismiss">×</button></div>
+
   <section class="stage" id="stage">
     <div class="polaroid" id="polaroid">
       <img id="cam" alt=""><div class="zz">💤</div>
@@ -221,6 +226,8 @@ const SLEEP = ['#1e1b4b', '#3730a3'], WORK = ['#0f766e', '#2563eb'], WATCH = ['#
 
 const STR = {
   pt_BR: {
+    cal_never:'Ainda não calibrei com você. Leva 40 s e acerta bastante.', cal_new:'Setup novo detectado (tela ou câmera diferente). Recalibrar?', cal_drift:'Parece que sua postura, a câmera ou o notebook mudou de lugar. Recalibrar?', cal_go:'📐 Calibrar',
+    hl_dark:'Está escuro: não consigo te ver direito.', hl_blocked:'Quase não te vejo enquanto você digita: câmera tapada ou fora de posição?',
     pause:'⏸ Pausar', resume:'▶ Retomar', p1h:'Por 1 hora', ptom:'Até amanhã', blur:'Borrar câmera', unblur:'Mostrar câmera', test:'Testar alerta', photo:'📸 Tirar foto', download:'Baixar', copy:'Copiar', share:'Compartilhar', close:'Fechar',
     head:'Cabeça vs. seu normal', gaze:'Olhar pra baixo vs. normal', downwin:'Olhando pra baixo (janela)', idlelbl:'Sem teclado/mouse', phonelbl:'Celular na câmera (YOLO)',
     lg_head:'cabeça (°)', lg_gaze:'olhar ×40', lg_down:'pra baixo', lg_phone:'celular visto', signals:'Sinais e detalhes', events:'Eventos',
@@ -241,6 +248,8 @@ const STR = {
     none_yet:'nada ainda', via_phone:n=>`${n} via 📱`, sec:'s', min:'min', h:'h',
     card_caught:'PEGO NO FLAGRA', card_back:'DE VOLTA AO JOGO', card_on:m=>`${m} no celular`, card_stamp:'NO CELULAR', card_stamp_back:'REABILITADO', card_foot:'on-duty · github.com/valvesss/on-duty-ai'},
   en_US: {
+    cal_never:'I haven’t calibrated to you yet. It takes 40 s and makes a big difference.', cal_new:'New setup detected (different screen or camera). Recalibrate?', cal_drift:'Your posture, camera or laptop seems to have moved. Recalibrate?', cal_go:'📐 Calibrate',
+    hl_dark:'It’s dark: I can’t see you well.', hl_blocked:'I barely see you while you type: camera covered or out of position?',
     pause:'⏸ Pause', resume:'▶ Resume', p1h:'For 1 hour', ptom:'Until tomorrow', blur:'Blur camera', unblur:'Show camera', test:'Test alert', photo:'📸 Snap', download:'Download', copy:'Copy', share:'Share', close:'Close',
     head:'Head vs. your normal', gaze:'Looking down vs. normal', downwin:'Looking down (window)', idlelbl:'No keyboard/mouse', phonelbl:'Phone in camera (YOLO)',
     lg_head:'head (°)', lg_gaze:'gaze ×40', lg_down:'looking down', lg_phone:'phone seen', signals:'Signals & details', events:'Events',
@@ -356,6 +365,14 @@ function onSaid(s) {
   if (!first && d.kind !== 'back' && d.level >= 4) { $('photo').classList.add('hot'); toast(L.toast_photo); }
 }
 
+let bannerOff = false;
+function banner(s) {
+  const c = s.calibration || {}, h = (s.health || [])[0];
+  const msg = h ? L['hl_' + h] : s.mode !== 'active' || !s.onboarded ? '' : c.state === 'never' ? L.cal_never : c.state === 'new_setup' ? L.cal_new : c.state === 'drift' ? L.cal_drift : '';
+  $('banner').style.display = msg && !bannerOff ? 'flex' : 'none'; $('bmsg').textContent = msg; $('bgo').textContent = L.cal_go; $('bgo').style.display = h ? 'none' : '';
+}
+$('bx').onclick = () => { bannerOff = true; $('banner').style.display = 'none'; };
+
 async function tick() {
   try {
     const s = await (await fetch('/status')).json();
@@ -379,6 +396,7 @@ async function tick() {
     const recent = !sleepy && s.said && now / 1000 - s.said.t < 30 && s.said.kind !== 'test' || s.said && now / 1000 - s.said.t < 12;
     if (s.said && s.said.kind === 'back' && now / 1000 - s.said.t < 20 && !s.scrolling) { key = 'back'; pal = PAL[0]; }
     setStage(key, lvl, pal);
+    banner(s);
     $('polaroid').classList.toggle('sleepy', !!sleepy);
     $('pause').textContent = s.mode === 'paused' ? L.resume : L.pause; $('pause').dataset.paused = s.mode === 'paused' ? 1 : '';
     onSaid(s);

@@ -42,6 +42,7 @@ git clone https://github.com/valvesss/on-duty-ai && cd on-duty-ai && ./onduty in
 | 🎭 **A live stage** | A mascot whose face — and the whole page's mood — escalates with every nag. The line being spoken **types out live** in a speech bubble. |
 | 📸 **Shareable moments** | One click turns a moment (or any line from the *Hall of shame*) into a 4:5 "caught red-handed" card for stories and group chats. |
 | 😴 **Not always on** | Sleeps — camera light off — when your screen sleeps or locks, outside your work hours, on breaks, or when you've walked away. |
+| 📐 **Calibration that adapts** | Zones for each monitor, a personal sensitivity, and automatic detection when you move, dock, or switch camera. |
 | 🧠 **Lines that sound like you** | Your AI assistant can write the phrases from what it already knows about you. |
 | 🔒 **Private by design** | No cloud, no account, no LLM at runtime. Frames never leave your Mac and are never saved. |
 
@@ -108,6 +109,28 @@ The bundled [`on-duty-phrases`](.claude/skills/on-duty-phrases/SKILL.md) skill l
 
 Using another assistant? `./onduty phrases template` prints the schema, `./onduty phrases validate` checks the result.
 
+## Calibration
+
+on-duty works out of the box by learning your posture while you type. For a rounder result, run the 40-second calibration (the wizard offers it; `./onduty recalibrate` or the 📐 button reopens it any time):
+
+1. **Where you look while working** — main screen, second monitor, keyboard/notes, laptop screen. Each place is a *zone* with its own baseline, so glancing at the other monitor never counts as scrolling.
+2. **How you look at your phone** — I measure how far your head and eyes drop, and set the trigger half-way between "working" and "phone", scaled by *Relaxed / Normal / Strict*.
+3. **Try it** — a live light shows what I'd flag, before you save.
+
+While you capture, you get live hints (too dark, too far, off-center, moving) and bad captures are rejected instead of saved.
+
+**It also notices when your setup changes** and asks to recalibrate:
+
+| What changed | What happens |
+|---|---|
+| Plugged in / unplugged a monitor | New *setup* detected (camera + number of displays + resolution). A banner offers to recalibrate; if you calibrated that setup before (home vs. office), it loads automatically. |
+| Switched camera (external webcam, another index) | Same: it's a different setup. The wizard has a **Switch camera** button. |
+| Moved the laptop, tilted the screen, new chair | Your typing posture shifts by more than ~9° for a few minutes → "your setup seems to have moved" banner. |
+| Slouching through the day | Absorbed silently (up to ±8°) without recalibrating. |
+| Dark room, camera covered | A "can't see you" banner instead of silent misses. |
+
+Each setup keeps its own saved calibration in `~/.on-duty/on-duty.db`.
+
 ## Commands
 
 ```text
@@ -115,9 +138,11 @@ Using another assistant? `./onduty phrases template` prints the schema, `./ondut
 ./onduty start | stop | restart   control it
 ./onduty open                     open the dashboard
 ./onduty setup                    reopen the setup wizard
+./onduty recalibrate              recalibrate for this desk / monitors / camera
 ./onduty pause 60 | tomorrow | 0  pause for N minutes, until tomorrow, or resume
 ./onduty status | logs | stats    what's it doing, tail the log, summary from the local database
 ./onduty doctor                   check your setup
+./onduty test                     run the unit tests
 ./onduty phrases template | validate | sources
 ```
 
@@ -132,6 +157,7 @@ Everything lives in `~/.on-duty/config.json` and is editable from the wizard.
 | `tone` | `balanced` | `friendly` · `balanced` · `ruthless` · `chaos` |
 | `voice` / `voice_on` | default / `true` | Any macOS voice; off = notifications and dashboard only |
 | `schedule` | Mon–Fri 09:00–18:00, break 12:00–13:30 | `"enforce": false` = always on |
+| `camera` | `0` | Camera index (the wizard's *Switch camera* button changes it) |
 | `phone_detection` | `true` | The YOLO phone detector |
 | `retention_days` | `365` | Events older than this are deleted at startup (`0` = keep forever) |
 | `port` | `4269` | Dashboard at `http://localhost:<port>` (restart after changing) |
