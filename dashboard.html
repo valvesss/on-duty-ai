@@ -236,7 +236,7 @@ const SLEEP = ['#1e1b4b', '#3730a3'], WORK = ['#0f766e', '#2563eb'], WATCH = ['#
 const STR = {
   pt_BR: {
     cal_never:'Ainda não calibrei com você. Leva 40 s e acerta bastante.', cal_new:'Setup novo detectado (tela ou câmera diferente). Recalibrar?', cal_drift:'Parece que sua postura, a câmera ou o notebook mudou de lugar. Recalibrar?', cal_go:'📐 Calibrar',
-    hl_dark:'Está escuro: não consigo te ver direito.', hl_blocked:'Quase não te vejo enquanto você digita: câmera tapada ou fora de posição?',
+    hl_camera:'Não consigo abrir a câmera (notebook fechado? outro app usando? permissão?).', hl_dark:'Está escuro: não consigo te ver direito.', hl_blocked:'Quase não te vejo enquanto você digita: câmera tapada ou fora de posição?',
     fb_no:'🙅 Não estava no celular', fb_miss:'📱 Você deixou passar', fb_no_t:'Anotado: fico mais relaxado.', fb_miss_t:'Anotado: fico mais rigoroso.', radar_hint:'Você é o ponto. A faixa vermelha é onde eu daria bronca; as manchas verdes são os lugares onde você trabalha.', tuned:t=>`ajuste fino: cabeça ${t.pitch >= 0 ? '+' : ''}${t.pitch}° · olhar ${t.gaze >= 0 ? '+' : ''}${t.gaze}`,
     cal_btn:'📐 Calibrar', cal_btn_ok:'📐 Recalibrar', cam_menu:'🎥 Câmera', mirror:'↔ Espelhar', unmirror:'↔ Sem espelho', level:'📐 Endireitar (sente reto)', leveling:'Medindo… sente reto', unlevel:'↺ Zerar inclinação', lv_ok:'Câmera endireitada.', lv_no:'Não vi seu rosto: nada mudou.',
     pause:'⏸ Pausar', resume:'▶ Retomar', p1h:'Por 1 hora', ptom:'Até amanhã', blur:'Borrar câmera', unblur:'Mostrar câmera', test:'Testar alerta', photo:'📸 Tirar foto', download:'Baixar', copy:'Copiar', share:'Compartilhar', close:'Fechar',
@@ -260,7 +260,7 @@ const STR = {
     card_caught:'PEGO NO FLAGRA', card_back:'DE VOLTA AO JOGO', card_on:m=>`${m} no celular`, card_stamp:'NO CELULAR', card_stamp_back:'REABILITADO', card_foot:'on-duty · github.com/valvesss/on-duty-ai'},
   en_US: {
     cal_never:'I haven’t calibrated to you yet. It takes 40 s and makes a big difference.', cal_new:'New setup detected (different screen or camera). Recalibrate?', cal_drift:'Your posture, camera or laptop seems to have moved. Recalibrate?', cal_go:'📐 Calibrate',
-    hl_dark:'It’s dark: I can’t see you well.', hl_blocked:'I barely see you while you type: camera covered or out of position?',
+    hl_camera:'I can’t open the camera (laptop closed? another app using it? permission?).', hl_dark:'It’s dark: I can’t see you well.', hl_blocked:'I barely see you while you type: camera covered or out of position?',
     fb_no:'🙅 I wasn’t on my phone', fb_miss:'📱 You missed one', fb_no_t:'Noted: I’ll be more relaxed.', fb_miss_t:'Noted: I’ll be stricter.', radar_hint:'You’re the dot. The red band is where I’d nag; the green blobs are where you work.', tuned:t=>`fine-tuning: head ${t.pitch >= 0 ? '+' : ''}${t.pitch}° · gaze ${t.gaze >= 0 ? '+' : ''}${t.gaze}`,
     cal_btn:'📐 Calibrate', cal_btn_ok:'📐 Recalibrate', cam_menu:'🎥 Camera', mirror:'↔ Mirror', unmirror:'↔ No mirror', level:'📐 Straighten (sit upright)', leveling:'Measuring… sit upright', unlevel:'↺ Reset tilt', lv_ok:'Camera straightened.', lv_no:'I couldn’t see your face: nothing changed.',
     pause:'⏸ Pause', resume:'▶ Resume', p1h:'For 1 hour', ptom:'Until tomorrow', blur:'Blur camera', unblur:'Show camera', test:'Test alert', photo:'📸 Snap', download:'Download', copy:'Copy', share:'Share', close:'Close',
@@ -386,7 +386,7 @@ function onSaid(s) {
 
 let bannerOff = false, radar = null, lastLevelNote = null;
 function banner(s) {
-  const c = s.calibration || {}, h = (s.health || [])[0];
+  const c = s.calibration || {}, h = s.camera_ok === false && s.mode === 'active' && s.onboarded ? 'camera' : (s.health || [])[0];
   const msg = h ? L['hl_' + h] : s.mode !== 'active' || !s.onboarded ? '' : c.state === 'never' ? L.cal_never : c.state === 'new_setup' ? L.cal_new : c.state === 'drift' ? L.cal_drift : '';
   $('banner').style.display = msg && !bannerOff ? 'flex' : 'none'; $('bmsg').textContent = msg; $('bgo').textContent = L.cal_go; $('bgo').style.display = h ? 'none' : '';
 }

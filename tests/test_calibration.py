@@ -201,5 +201,40 @@ class PhoneRatio(unittest.TestCase):
         self.assertTrue(s.live(1.0)["phone_seen"])
 
 
+class SetupSwitching(unittest.TestCase):
+    """The desk/monitor story: home (1 display), office (2 displays), back again."""
+
+    def profile(self, pitch, phone_pitch):
+        return {"label": "x", "zones": [{"name": "main", "pitch": pitch, "yaw": 0, "gaze": 0.3}], "created": 1,
+                "phone": {"pitch": phone_pitch, "gaze": 0.6}, "sensitivity": "normal"}
+
+    def test_never_then_new_setup(self):
+        self.assertEqual(c.load_setup(None, False)["state"], "never")
+        self.assertEqual(c.load_setup(None, True)["state"], "new_setup")
+
+    def test_plug_calibrate_unplug_replug(self):
+        saved = {}
+        home, office = c.setup_signature(0, 1, 1920, 1080), c.setup_signature(0, 2, 1920, 1080)
+        self.assertNotEqual(home, office)
+        # first run at home: nothing known
+        self.assertEqual(c.load_setup(saved.get(home), bool(saved))["state"], "never")
+        saved[home] = self.profile(-10, 6)                       # calibrate at home
+        # plug the external monitor: a different setup, but the user has calibrated before
+        s = c.load_setup(saved.get(office), bool(saved))
+        self.assertEqual((s["state"], s["zones"]), ("new_setup", []))
+        saved[office] = self.profile(2, 24)                      # calibrate the office
+        # unplug: home comes back with ITS zones and ITS thresholds
+        h = c.load_setup(saved.get(home), bool(saved))
+        self.assertEqual((h["state"], h["zones"][0]["pitch"]), ("ok", -10))
+        # replug: office again, different thresholds
+        o = c.load_setup(saved.get(office), bool(saved))
+        self.assertEqual((o["state"], o["zones"][0]["pitch"]), ("ok", 2))
+        self.assertNotEqual(h["overrides"], o["overrides"])
+
+    def test_old_profiles_get_current_floors(self):
+        p = self.profile(0, 8)  # an old build would have saved a 4-5° trigger for this
+        self.assertGreaterEqual(c.load_setup(p, True)["overrides"]["pitch_delta"], c.PITCH_FLOOR)
+
+
 if __name__ == "__main__":
     unittest.main()

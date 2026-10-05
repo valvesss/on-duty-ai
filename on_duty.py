@@ -694,9 +694,9 @@ def main() -> None:
                 if sig != setup["sig"]:
                     first = setup["sig"] is None
                     prof, _ = db.get(f"setup:{sig}")
-                    setup.update(sig=sig, displays=display_count(), label=prof["label"] if prof else "", created=prof["created"] if prof else 0,
-                                 state="ok" if prof else ("new_setup" if db.keys("setup:") else "never"))
-                    zones, overrides = (prof["zones"], calibration.derive_thresholds(prof["zones"], prof.get("phone"), prof.get("sensitivity", "normal"))) if prof else ([], {})  # re-derived: profiles saved by older builds pick up the current floors
+                    loaded = calibration.load_setup(prof, bool(db.keys("setup:")))
+                    setup.update(sig=sig, displays=display_count(), label=loaded["label"], created=loaded["created"], state=loaded["state"])
+                    zones, overrides = loaded["zones"], loaded["overrides"]
                     tuning = db.get(f"tuning:{sig}", {"pitch": 0.0, "gaze": 0.0})[0]
                     th = eff_th()
                     resid.clear()

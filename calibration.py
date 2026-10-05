@@ -122,6 +122,15 @@ def setup_signature(camera: int, displays: int, width: int, height: int) -> str:
     return f"cam{camera}-{displays}d-{width}x{height}"
 
 
+def load_setup(profile: dict | None, has_other_setups: bool) -> dict:
+    """What to use for the setup we just detected: its saved calibration if there is one (thresholds re-derived, so
+    profiles written by older builds pick up the current floors), otherwise a banner state."""
+    if not profile:
+        return {"state": "new_setup" if has_other_setups else "never", "zones": [], "overrides": {}, "label": "", "created": 0}
+    return {"state": "ok", "zones": profile["zones"], "label": profile.get("label", ""), "created": profile.get("created", 0),
+            "overrides": derive_thresholds(profile["zones"], profile.get("phone"), profile.get("sensitivity", "normal"))}
+
+
 def setup_label(displays: int, camera: int) -> str:
     return f"{displays} display{'s' if displays != 1 else ''} · camera {camera}"
 
