@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+status.json
+OnDuty.app/
+models/
+*.pt
+*.task
+history.jsonl*
+.DS_Store

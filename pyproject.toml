@@ -1,0 +1,15 @@
+[project]
+name = "on-duty-ai"
+version = "0.3.0"
+description = "Your webcam notices when you leave work for your phone, and talks you back."
+license = { text = "MIT" }
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "mediapipe==0.10.21",
+    "opencv-python>=4.10",
+    "numpy",
+    "ultralytics>=8.3",
+]
+
+[project.optional-dependencies]
+ai = ["anthropic>=0.60", "pydantic>=2"]

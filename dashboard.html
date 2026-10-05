@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>on-duty</title>
+<style>
+  :root { --bg:#f6f6f4; --card:#fff; --fg:#1b1b1a; --mute:#77756f; --line:#e4e2dc;
+          --ok:#1f8a4c; --warn:#c77b0a; --bad:#d23a2f; --acc:#3b6fd4; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#141413; --card:#1e1e1c; --fg:#ecebe6; --mute:#9a988f; --line:#2f2e2b; } }
+  * { box-sizing:border-box }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.4 -apple-system, system-ui, sans-serif; }
+  main { max-width:980px; margin:0 auto; padding:24px 16px; display:grid; gap:16px; grid-template-columns: 480px 1fr; }
+  @media (max-width: 860px) { main { grid-template-columns:1fr } }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; }
+  h1 { grid-column:1/-1; margin:0; font-size:20px; display:flex; align-items:center; gap:12px; }
+  .pill { font-size:13px; font-weight:600; padding:4px 10px; border-radius:99px; color:#fff; background:var(--mute); }
+  img { width:100%; border-radius:10px; display:block; background:#000; aspect-ratio:4/3; object-fit:cover; }
+  .big { font-size:28px; font-weight:700; margin:4px 0 12px; }
+  .grid { display:grid; grid-template-columns: repeat(2, 1fr); gap:10px; }
+  .m { border:1px solid var(--line); border-radius:10px; padding:10px; }
+  .m b { display:block; font-size:20px; font-variant-numeric:tabular-nums; }
+  .m span { color:var(--mute); font-size:12px; }
+  .bar { height:6px; background:var(--line); border-radius:3px; margin-top:6px; overflow:hidden; }
+  .bar i { display:block; height:100%; background:var(--acc); }
+  canvas { width:100%; height:110px; display:block; }
+  ul { list-style:none; padding:0; margin:0; font-size:14px; max-height:160px; overflow:auto; }
+  li { padding:4px 0; border-bottom:1px solid var(--line); }
+  button { font:inherit; border:1px solid var(--line); background:var(--card); color:var(--fg);
+           border-radius:8px; padding:6px 12px; cursor:pointer; margin-left:auto; }
+  .hint { color:var(--mute); font-size:12px; margin-top:8px; }
+  .legend { display:flex; gap:12px; font-size:12px; color:var(--mute); margin-bottom:4px; }
+  .legend i { display:inline-block; width:10px; height:3px; vertical-align:middle; margin-right:4px; }
+  .hist { grid-column:1/-1 }
+  .logo { width:32px; height:32px }
+  t { display:inline }
+  .row { display:flex; align-items:baseline; gap:10px; margin-bottom:12px }
+  .kpis { display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-bottom:14px }
+  @media (max-width: 860px) { .kpis { grid-template-columns:repeat(2,1fr) } .two { grid-template-columns:1fr !important } }
+  .kpis b { font-size:26px }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:16px }
+  .two canvas { height:140px }
+</style>
+</head>
+<body>
+<main>
+  <h1><img src="/logo.svg" alt="" class="logo">on-duty <span class="pill" id="pill">…</span><button id="blur" data-i="blur" style="margin-left:auto"></button><button id="test" data-i="test" style="margin-left:0"></button></h1>
+  <div class="card"><img id="cam" alt=""><div class="hint" id="age"></div></div>
+  <div class="card">
+    <div class="big" id="headline">…</div>
+    <div class="grid">
+      <div class="m"><span data-i="head"></span><b id="dp">–</b><span id="dpt"></span></div>
+      <div class="m"><span data-i="gaze"></span><b id="gz">–</b><span id="gzt"></span></div>
+      <div class="m"><span data-i="downwin"></span><b id="dr">–</b><div class="bar"><i id="drb"></i></div></div>
+      <div class="m"><span data-i="idlelbl"></span><b id="idle">–</b><div class="bar"><i id="idleb"></i></div></div>
+      <div class="m" style="grid-column:1/-1"><span data-i="phonelbl"></span><b id="ph">–</b><span id="pht"></span></div>
+    </div>
+    <div class="hint" id="calib"></div>
+  </div>
+  <div class="card">
+    <div class="legend"><span><i style="background:var(--acc)"></i><t data-i="lg_head"></t></span><span><i style="background:var(--warn)"></i><t data-i="lg_gaze"></t></span><span><i style="background:var(--bad);height:8px;opacity:.25"></i><t data-i="lg_down"></t></span><span><i style="background:var(--bad);height:8px;width:8px;border-radius:4px"></i><t data-i="lg_phone"></t></span></div>
+    <canvas id="chart"></canvas>
+    <div class="hint" data-i="chart_hint"></div>
+  </div>
+  <section class="card hist">
+    <div class="row"><b data-i="history"></b><span class="hint" id="hsub"></span></div>
+    <div class="kpis">
+      <div class="m"><span data-i="k_min"></span><b id="k-min">–</b></div>
+      <div class="m"><span data-i="k_n"></span><b id="k-n">–</b></div>
+      <div class="m"><span data-i="k_al"></span><b id="k-al">–</b></div>
+      <div class="m"><span data-i="k_max"></span><b id="k-max">–</b></div>
+      <div class="m"><span data-i="k_wk"></span><b id="k-wk">–</b></div>
+      <div class="m"><span data-i="k_avg"></span><b id="k-avg">–</b></div>
+    </div>
+    <div class="two">
+      <div><div class="hint" data-i="byhour"></div><canvas id="byhour"></canvas></div>
+      <div><div class="hint" data-i="byday"></div><canvas id="byday"></canvas></div>
+    </div>
+    <div class="hint" style="margin-top:12px" data-i="recent"></div>
+    <ul id="sess"></ul>
+  </section>
+  <div class="card"><b data-i="events"></b><ul id="ev"></ul></div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const STR = {
+  pt_BR: {
+    blur:'Borrar câmera', unblur:'Mostrar câmera', test:'Testar alerta', head:'Cabeça vs. seu normal', gaze:'Olhar pra baixo vs. normal',
+    downwin:'Olhando pra baixo (janela)', idlelbl:'Sem teclado/mouse', phonelbl:'Celular na câmera (YOLO)',
+    lg_head:'cabeça (°)', lg_gaze:'olhar ×40', lg_down:'pra baixo', lg_phone:'celular visto',
+    chart_hint:'últimos 2 min · linha tracejada = limiar da cabeça', history:'Histórico', k_min:'Hoje no celular',
+    k_n:'Vezes que pegou hoje', k_al:'Alertas hoje', k_max:'Maior sessão hoje', k_wk:'Últimos 7 dias', k_avg:'Média por dia (7d)',
+    byhour:'minutos no celular por hora · hoje', byday:'minutos no celular por dia · 14 dias', recent:'sessões recentes', events:'Eventos',
+    connecting:'conectando…', calibrating:'calibrando', calibrating_msg:'Digita uns 10 s pra eu aprender sua postura',
+    on_phone:'NO CELULAR', on_phone_msg:(m,l,n)=>`📵 no celular há ${m} min · nível ${l}/5 · fala ${n}`,
+    phone_seen:'celular à vista', phone_seen_msg:'📱 tô vendo um celular aí…', looking_down:'olhando pra baixo', looking_down_msg:'olhando pra baixo…',
+    no_face:'sem rosto', no_face_msg:'não estou vendo seu rosto', working:'trabalhando', working_msg:'✅ de olho na tela',
+    alert_above:v=>`alerta acima de +${v}°`, gaze_above:v=>`alerta acima de +${v}`, off:'desligado', visible:'📱 visível agora', no:'não',
+    seen_in:p=>` · visto em ${p}% da janela`, calib:(n,c)=>`postura aprendida com ${n} amostras · gatilho: celular visto + ${c.phone_idle} s sem teclado (imediato) OU pra baixo ≥ ${c.down_ratio*100}% dos últimos ${c.window} s + ${c.idle} s sem teclado · só para quando você volta a digitar`,
+    none_yet:'nada ainda', updated:s=>`atualizado ${s} s atrás`, offline:'serviço fora do ar', offline_pill:'offline',
+    sessions:n=>`${n} sessões registradas`, via_phone:n=>`${n} via 📱`, no_sessions:'nenhuma sessão ainda',
+    on_phone_row:(m,a)=>`<b>${m}</b> no celular · ${a} alerta${a===1?'':'s'}`, sec:'s', min:'min', h:'h'},
+  en_US: {
+    blur:'Blur camera', unblur:'Show camera', test:'Test alert', head:'Head vs. your normal', gaze:'Looking down vs. normal',
+    downwin:'Looking down (window)', idlelbl:'No keyboard/mouse', phonelbl:'Phone in camera (YOLO)',
+    lg_head:'head (°)', lg_gaze:'gaze ×40', lg_down:'looking down', lg_phone:'phone seen',
+    chart_hint:'last 2 min · dashed line = head threshold', history:'History', k_min:'On phone today',
+    k_n:'Times today', k_al:'Alerts today', k_max:'Longest session today', k_wk:'Last 7 days', k_avg:'Daily average (7d)',
+    byhour:'minutes on phone per hour · today', byday:'minutes on phone per day · 14 days', recent:'recent sessions', events:'Events',
+    connecting:'connecting…', calibrating:'calibrating', calibrating_msg:'Type for ~10 s so I can learn your posture',
+    on_phone:'ON PHONE', on_phone_msg:(m,l,n)=>`📵 on the phone for ${m} min · level ${l}/5 · line ${n}`,
+    phone_seen:'phone in view', phone_seen_msg:'📱 I see a phone there…', looking_down:'looking down', looking_down_msg:'looking down…',
+    no_face:'no face', no_face_msg:"I can't see your face", working:'working', working_msg:'✅ eyes on the screen',
+    alert_above:v=>`alert above +${v}°`, gaze_above:v=>`alert above +${v}`, off:'off', visible:'📱 visible now', no:'no',
+    seen_in:p=>` · seen in ${p}% of the window`, calib:(n,c)=>`posture learned from ${n} samples · trigger: phone seen + ${c.phone_idle} s without keyboard (instant) OR looking down ≥ ${c.down_ratio*100}% of the last ${c.window} s + ${c.idle} s without keyboard · stops only when you type again`,
+    none_yet:'nothing yet', updated:s=>`updated ${s} s ago`, offline:'service is down', offline_pill:'offline',
+    sessions:n=>`${n} sessions recorded`, via_phone:n=>`${n} via 📱`, no_sessions:'no sessions yet',
+    on_phone_row:(m,a)=>`<b>${m}</b> on phone · ${a} alert${a===1?'':'s'}`, sec:'s', min:'min', h:'h'},
+};
+let LANG = 'pt_BR', L = STR.pt_BR;
+function setLang(l) {
+  if (!STR[l] || l === LANG && document.documentElement.dataset.set) return;
+  LANG = l; L = STR[l]; document.documentElement.dataset.set = 1; document.documentElement.lang = l.replace('_', '-');
+  document.querySelectorAll('[data-i]').forEach(e => { const v = L[e.dataset.i]; if (typeof v === 'string') e.textContent = v; });
+  $('headline').textContent = L.connecting;
+}
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const fmt = (v, d=1) => v == null ? '–' : (v > 0 ? '+' : '') + v.toFixed(d);
+
+$('test').onclick = () => fetch('/test', {method:'POST'});
+$('blur').onclick = () => fetch('/blur', {method:'POST'});
+
+function draw(series, thr) {
+  const c = $('chart'), dpr = devicePixelRatio || 1, W = c.clientWidth, H = c.clientHeight;
+  c.width = W * dpr; c.height = H * dpr;
+  const g = c.getContext('2d'); g.scale(dpr, dpr);
+  if (!series.length) return;
+  const lo = -25, hi = 35, y = v => H - (Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo) * H;
+  const x = i => i / Math.max(1, series.length - 1) * W;
+  g.fillStyle = css('--bad'); g.globalAlpha = .15;
+  series.forEach((p, i) => { if (p[3]) g.fillRect(x(i), 0, W / series.length + 1, H); });
+  g.globalAlpha = 1; g.strokeStyle = css('--line'); g.beginPath(); g.moveTo(0, y(0)); g.lineTo(W, y(0)); g.stroke();
+  g.setLineDash([4, 4]); g.strokeStyle = css('--bad'); g.beginPath(); g.moveTo(0, y(thr)); g.lineTo(W, y(thr)); g.stroke(); g.setLineDash([]);
+  g.fillStyle = css('--bad');
+  series.forEach((p, i) => { if (p[5]) { g.beginPath(); g.arc(x(i), 6, 3, 0, 7); g.fill(); } });
+  for (const [k, col, s] of [[1, '--acc', 1], [2, '--warn', 40]]) {
+    g.strokeStyle = css(col); g.lineWidth = 2; g.beginPath(); let on = false;
+    series.forEach((p, i) => { if (p[k] == null) { on = false; return; } const yy = y(p[k] * s); on ? g.lineTo(x(i), yy) : g.moveTo(x(i), yy); on = true; });
+    g.stroke();
+  }
+}
+
+async function tick() {
+  try {
+    const s = await (await fetch('/status')).json();
+    const c = s.cfg || {};
+    setLang(s.lang);
+    $('blur').textContent = s.blur ? L.unblur : L.blur;
+    const state = !s.calibrated ? [L.calibrating, '--warn', L.calibrating_msg]
+      : s.scrolling ? [L.on_phone, '--bad', L.on_phone_msg(s.phone_min, s.level, s.nags)]
+      : s.phone ? [L.phone_seen, '--warn', L.phone_seen_msg]
+      : s.down ? [L.looking_down, '--warn', L.looking_down_msg]
+      : !s.face ? [L.no_face, '--mute', L.no_face_msg]
+      : [L.working, '--ok', L.working_msg];
+    $('pill').textContent = state[0]; $('pill').style.background = css(state[1]);
+    $('headline').textContent = state[2]; $('headline').style.color = css(state[1]);
+    $('dp').textContent = s.dpitch == null ? '–' : fmt(s.dpitch) + '°';
+    $('dpt').textContent = L.alert_above(c.pitch_delta);
+    const gd = s.gaze == null ? null : s.gaze - s.gaze_base;
+    $('gz').textContent = fmt(gd, 2); $('gzt').textContent = L.gaze_above(c.gaze_delta);
+    $('ph').textContent = !s.phone_on ? L.off : s.phone ? L.visible : L.no;
+    $('ph').style.color = css(s.phone ? '--bad' : '--fg');
+    $('pht').textContent = s.phone_on ? L.seen_in(Math.round(s.phone_ratio * 100)) : '';
+    $('dr').textContent = Math.round(s.down_ratio * 100) + '%';
+    $('drb').style.width = Math.min(100, s.down_ratio / c.down_ratio * 100) + '%';
+    $('drb').style.background = css(s.down_ratio >= c.down_ratio ? '--bad' : '--acc');
+    $('idle').textContent = s.idle + ' s';
+    $('idleb').style.width = Math.min(100, s.idle / c.idle * 100) + '%';
+    $('idleb').style.background = css(s.idle >= c.idle ? '--bad' : '--acc');
+    $('calib').textContent = L.calib(s.work_samples, c);
+    $('ev').innerHTML = s.events.length ? s.events.map(e => `<li>${e}</li>`).join('') : `<li class="hint">${L.none_yet}</li>`;
+    $('age').textContent = L.updated(Math.max(0, Math.round(Date.now() / 1000 - s.t)));
+    draw(s.series.slice(-240), c.pitch_delta);
+    $('cam').src = '/frame.jpg?' + Date.now();
+  } catch { $('headline').textContent = L.offline; $('pill').textContent = L.offline_pill; }
+}
+const mins = m => m < 1 ? Math.round(m * 60) + ' ' + L.sec : m < 60 ? m.toFixed(1).replace('.0', '') + ' ' + L.min : (m / 60).toFixed(1) + ' ' + L.h;
+const dayKey = d => d.toLocaleDateString('sv');  // YYYY-MM-DD local
+
+function bars(id, labels, vals, hl) {
+  const c = $(id), dpr = devicePixelRatio || 1, W = c.clientWidth, H = c.clientHeight;
+  c.width = W * dpr; c.height = H * dpr;
+  const g = c.getContext('2d'); g.scale(dpr, dpr);
+  const max = Math.max(1, ...vals), bw = W / vals.length, top = 14, bot = 16;
+  g.font = '10px system-ui'; g.textAlign = 'center';
+  vals.forEach((v, i) => {
+    const h = v / max * (H - top - bot);
+    g.fillStyle = css(i === hl ? '--bad' : '--acc'); g.globalAlpha = v ? 1 : .2;
+    g.fillRect(i * bw + 2, H - bot - Math.max(h, 1), bw - 4, Math.max(h, 1));
+    g.globalAlpha = 1; g.fillStyle = css('--mute');
+    if (v) g.fillText(v < 1 ? Math.round(v * 60) + 's' : Math.round(v), i * bw + bw / 2, H - bot - h - 3);
+    if (labels[i]) g.fillText(labels[i], i * bw + bw / 2, H - 3);
+  });
+}
+
+async function history() {
+  const txt = await (await fetch('/history')).text();
+  const ev = txt.split('\n').filter(Boolean).map(l => JSON.parse(l));
+  const sess = ev.filter(e => e.kind === 'back'), alerts = ev.filter(e => e.kind === 'alert');
+  const now = new Date(), today = dayKey(now), weekAgo = now / 1000 - 7 * 86400;
+  const todayS = sess.filter(e => dayKey(new Date(e.start * 1000)) === today);
+  const sum = a => a.reduce((x, e) => x + e.minutes, 0);
+  $('k-min').textContent = mins(sum(todayS));
+  $('k-n').textContent = todayS.length;
+  const alT = alerts.filter(e => dayKey(new Date(e.t * 1000)) === today);
+  $('k-al').innerHTML = alT.length + (alT.length ? ` <span class="hint">${L.via_phone(alT.filter(e => (e.cause || '').includes('phone') || (e.cause || '').includes('celular')).length)}</span>` : '');
+  $('k-max').textContent = todayS.length ? mins(Math.max(...todayS.map(e => e.minutes))) : '–';
+  const wk = sum(sess.filter(e => e.start >= weekAgo));
+  $('k-wk').textContent = mins(wk); $('k-avg').textContent = mins(wk / 7);
+  $('hsub').textContent = L.sessions(sess.length);
+  const hours = Array(24).fill(0); todayS.forEach(e => hours[new Date(e.start * 1000).getHours()] += e.minutes);
+  bars('byhour', hours.map((_, h) => h % 3 ? '' : h + L.h), hours, now.getHours());
+  const days = [...Array(14)].map((_, i) => { const d = new Date(now); d.setDate(d.getDate() - 13 + i); return d; });
+  bars('byday', days.map((d, i) => i % 2 ? '' : d.getDate() + '/' + (d.getMonth() + 1)),
+       days.map(d => sum(sess.filter(e => dayKey(new Date(e.start * 1000)) === dayKey(d)))), 13);
+  $('sess').innerHTML = sess.slice(-12).reverse().map(e => {
+    const d = new Date(e.start * 1000);
+    return `<li>${d.toLocaleDateString(LANG.replace('_', '-'), {day:'2-digit', month:'2-digit'})} ${d.toLocaleTimeString(LANG.replace('_', '-'), {hour:'2-digit', minute:'2-digit'})} · ${L.on_phone_row(mins(e.minutes), e.alerts)}</li>`;
+  }).join('') || `<li class="hint">${L.no_sessions}</li>`;
+}
+
+tick(); setInterval(tick, 700);
+history(); setInterval(history, 10000);
+</script>
+</body>
+</html>

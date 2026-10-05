@@ -1,0 +1,2 @@
+#!/bin/zsh
+exec uv run --project "${0:A:h}" python "${0:A:h}/onduty.py" "$@"

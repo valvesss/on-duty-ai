@@ -1,0 +1,122 @@
+"""Falas do on-duty. Item = frase (str) ou combo (lista de frases ditas em sequência).
+Placeholders: {time} = há quanto tempo no celular ("40 segundos", "3 minutos"), {n} = qual cutucada é essa.
+Cada nível é usado por NAGS_PER_LEVEL cutucadas antes de escalar."""
+
+LEVELS = [
+    # 1 — gentil
+    [
+        "Ei. Celular na mão? Volta pra tela.",
+        "Psiu. Isso aí não é trabalho.",
+        "Só lembrando: o código não se escreve sozinho.",
+        "Celular detectado. Bora voltar?",
+        "Opa, pausa pro celular? Fecha isso e volta.",
+        "Ei, foco. O celular espera.",
+        "Lembra o que você tava fazendo? Pois é. Volta lá.",
+        ["Uma pergunta rápida.", "Isso que você tá vendo é mais importante que o seu trabalho?"],
+        "Tá rolando o feed? Rola de volta pro editor.",
+        "Já são {time}. Larga o celular.",
+        "Celular pra baixo, olhos pra cima.",
+        "Volta pro jogo.",
+        "{name}, celular na mão? Volta pra tela.",
+        "Ô {name}, o trabalho tá te esperando.",
+        ["{name}.", "Só {name}.", "Volta."],
+    ],
+    # 2 — sarcástico
+    [
+        "Que vídeo bom esse, hein? Pena que não paga suas contas.",
+        "{time} no celular. O algoritmo agradece sua dedicação.",
+        ["Notícia urgente.", "Nada aconteceu no feed que você precise saber.", "Volta."],
+        "Parabéns, você é o destaque do mês do Instagram.",
+        "Esse dedo aí tá treinando pra maratona de rolagem?",
+        "Seu chefe tá olhando. Mentira. Mas eu tô.",
+        "O deploy não vai se fazer com você rolando story.",
+        ["Deixa eu adivinhar.", "Só mais um vídeo, né?", "Clássico."],
+        "Cada minuto nesse celular é um bug a mais em produção.",
+        "Você não tá descansando. Você tá sendo farmado.",
+        "Interessante. Você tá produzindo exatamente zero linhas de código agora.",
+        "Cutucada número {n}. Eu tenho a tarde inteira, e você?",
+        "{name}, você tá sendo o produto agora, sabia?",
+        ["Sabe quem tá rolando o feed há {time}?", "{name}. Sim, {name}."],
+        "Que bonito, {name}. Que bonito.",
+    ],
+    # 3 — cobrança
+    [
+        "Já são {time}. Isso já não é pausa, é fuga.",
+        ["Larga.", "O.", "Celular."],
+        "Você vai olhar pra trás e se arrepender desses {time}.",
+        ["Faz assim.", "Vira o celular pra baixo.", "Agora.", "Eu espero."],
+        "Ninguém no seu leito de morte vai dizer: queria ter visto mais reels.",
+        "As tarefas estão acumulando enquanto você assiste estranhos dançando.",
+        "Sério. Coloca o celular longe do braço. Agora.",
+        "{time} jogados fora. Quer fazer virar mais?",
+        ["Respira fundo.", "Solta o celular.", "Põe a mão no teclado.", "Pronto, foi fácil."],
+        "Você mesmo pediu pra eu te encher o saco. Então lá vai: volta pro trabalho.",
+        "Esse feed é infinito. Seu dia não é.",
+        "Cutucada {n}. Não vou parar até você voltar.",
+        ["{name}.", "Olha pra mim.", "Larga esse celular."],
+        "{name}, eu vou falar seu nome até você voltar. {name}. {name}.",
+        "Você não contratou isso aqui à toa, {name}. Volta.",
+    ],
+    # 4 — drama
+    [
+        ["Alerta vermelho.", "Alerta vermelho.", "Dev perdido no feed há {time}.", "Equipe de resgate acionada."],
+        "Eu já vi gente perder carreira assim. Começa com só mais um vídeo.",
+        ["Querido diário.", "Hoje foram {time} no celular.", "De novo.", "Eu tô cansada."],
+        "Seu eu do futuro tá chorando agora. Por sua causa.",
+        ["Atenção, atenção.", "Alguém aqui continua no celular.", "Repito.", "Alguém aqui continua no celular."],
+        "Cada vez que você rola esse feed, um commit morre sozinho.",
+        "Eu vou continuar falando. E falando. E falando. Até você voltar.",
+        ["Você conhece a lenda de quem ia só checar uma notificação?", "Nunca mais foi visto."],
+        "Isso aqui é uma intervenção. Larga o celular.",
+        "Os seus clientes não vão pagar por story assistido.",
+        ["Três.", "Dois.", "Um.", "Celular na mesa."],
+        "{time}. Você podia ter terminado aquela tarefa. Duas vezes.",
+        ["Atenção, família de {name}.", "O feed abduziu {name}.", "Mandem ajuda."],
+        "{name}, seu eu do futuro mandou dizer: volta.",
+        ["Era uma vez {name}.", "Que tinha um prazo.", "E um celular.", "Adivinha quem ganhou."],
+    ],
+    # 5 — caos
+    [
+        ["Eu não vou desistir.", "Eu não durmo.", "Eu não pisco.", "Eu sou uma webcam."],
+        "Larga o celular, larga o celular, larga o celular, larga o celular.",
+        ["Bom.", "Já que você não me ouve.", "Vou começar a narrar sua vida.", "Continua no celular.", "Fascinante."],
+        "Cutucada número {n}. Isso já virou relacionamento abusivo. Da sua parte, com o celular.",
+        ["Se você voltar pro teclado agora", "eu juro que fico quieta.", "Promessa."],
+        "Tô ficando rouca aqui. Tem {time} que eu falo sozinha.",
+        ["Plantão de notícias.", "Pessoa é encontrada há {time} rolando o feed.", "Testemunhas dizem que tinha trabalho pra fazer."],
+        "Eu poderia estar desligada. Mas não. Estou aqui. Por você. Volta.",
+        ["Ok. Última tentativa.", "Mentira.", "Eu tenho infinitas tentativas."],
+        "O algoritmo do celular é bom. Mas eu sou mais chata.",
+        ["Toc toc.", "Quem é?", "É o seu prazo.", "Ele tá vencendo."],
+        "Você tá me obrigando a repetir isso. Larga. Esse. Celular.",
+        ["{name}, {name}, {name}.", "Eu sei que você tá me ouvindo."],
+        ["Última chamada para {name}.", "Embarque imediato no portão Trabalho.", "O voo não espera."],
+        "{name}. Eu tô literalmente vendo você. Larga.",
+    ],
+]
+
+# ao voltar pro teclado, por tempo no celular
+BACK = {
+    "quick": [  # < 1 min
+        "Boa! Voltou rápido.",
+        "Isso aí, {name}.",
+        "Isso aí. Foco.",
+        "Ótimo. Nem doeu.",
+        "Que bom que voltou.",
+    ],
+    "medium": [  # 1–5 min
+        "Até que enfim. Bora.",
+        "Bem na hora, {name}. Agora fica.",
+        "Olha quem voltou. Vamos trabalhar.",
+        "Ufa. Agora sim.",
+        "Voltou. Eu sabia que você conseguia.",
+        "Boa. Agora fica.",
+    ],
+    "long": [  # > 5 min
+        "Finalmente! {time}. Não vamos falar sobre isso.",
+        "Voltou! Depois de {time}. Perdoei. Por enquanto.",
+        "{time} depois, a lenda retorna. Bora recuperar o tempo.",
+        "Voltou. Eu tava quase chamando os bombeiros.",
+        "{name} voltou depois de {time}! Ninguém comenta, só trabalha.",
+    ],
+}
