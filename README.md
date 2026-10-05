@@ -13,7 +13,7 @@ Local. Private. Slightly judgmental.
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![No cloud](https://img.shields.io/badge/cloud-none-success)
 
-<img src="assets/dashboard.png" width="820" alt="The on-duty live dashboard at nag level 5, camera blurred">
+<img src="assets/dashboard.png" width="820" alt="The on-duty live dashboard, camera blurred">
 
 </div>
 

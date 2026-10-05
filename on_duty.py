@@ -57,6 +57,8 @@ def log(msg: str) -> None:
         STATE["events"].appendleft(f"{dt.datetime.now():%H:%M:%S} {msg}")
 
 
+ASSETS = {"/logo.svg": ("logo.svg", "image/svg+xml"), "/favicon.svg": ("favicon.svg", "image/svg+xml"),
+          "/favicon.ico": ("favicon.ico", "image/x-icon"), "/apple-touch-icon.png": ("apple-touch-icon.png", "image/png")}
 CFG: dict = {}  # live config; mutated in place by POST /api/config, picked up by the main loop
 HHMM = __import__("re").compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
@@ -135,7 +137,8 @@ class Dashboard(BaseHTTPRequestHandler):
     def _send(self, body: bytes, ctype: str, code: int = 200, headers: dict | None = None) -> None:
         self.send_response(code)
         self.send_header("Content-Type", ctype)
-        self.send_header("Cache-Control", "no-store")
+        if "Cache-Control" not in (headers or {}):
+            self.send_header("Cache-Control", "no-store")
         for k, v in (headers or {}).items():
             self.send_header(k, v)
         self.end_headers()
@@ -153,8 +156,9 @@ class Dashboard(BaseHTTPRequestHandler):
             self._send(db.history_ndjson(), "application/x-ndjson")
         elif path == "/frame.jpg":
             self._send(STATE["jpeg"], "image/jpeg")
-        elif path == "/logo.svg":
-            self._send((HERE / "assets" / "logo.svg").read_bytes(), "image/svg+xml")
+        elif path in ASSETS:
+            name, ctype = ASSETS[path]
+            self._send((HERE / "assets" / name).read_bytes(), ctype, headers={"Cache-Control": "public, max-age=3600"})
         elif path == "/api/config":
             self._json({"config": CFG, "voices": voices(), "tones": config.TONES})
         elif path == "/api/sample":
@@ -524,7 +528,8 @@ def main() -> None:
                 cv2.putText(frame, "phone", (x1, max(30, y1 - 10)), cv2.FONT_HERSHEY_SIMPLEX, 1.1, (94, 63, 244), 3)
             small = cv2.resize(frame, (480, int(480 * frame.shape[0] / frame.shape[1])))
             if STATE["blur"]:  # dashboard preview only; detection already ran on the sharp frame
-                small = cv2.GaussianBlur(small, (0, 0), 18)
+                h, w = small.shape[:2]  # heavy pixelate + blur: unrecognizable but still shows the pose
+                small = cv2.resize(cv2.GaussianBlur(cv2.resize(small, (24, 18), interpolation=cv2.INTER_AREA), (0, 0), 2), (w, h), interpolation=cv2.INTER_CUBIC)
             STATE["jpeg"] = cv2.imencode(".jpg", small, [cv2.IMWRITE_JPEG_QUALITY, 70])[1].tobytes()
 
             time.sleep(max(0, 1 / a.fps - (time.time() - t0)))

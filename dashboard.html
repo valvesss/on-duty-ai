@@ -4,7 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>on-duty</title>
-<link rel="icon" href="/logo.svg">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <style>
   :root { --bg:#f4f3ef; --card:#fff; --fg:#1b1b1a; --mute:#77756f; --line:#e4e2dc;
           --ok:#1f8a4c; --warn:#c77b0a; --bad:#d23a2f; --acc:#3b6fd4;
@@ -59,7 +61,7 @@
   @keyframes stampIn { from { transform:rotate(12deg) scale(2.4); opacity:0 } }
 
   .talk { display:grid; gap:14px; justify-items:start; min-width:0 }
-  .mascot { width:170px; height:110px; overflow:visible; filter:drop-shadow(0 8px 14px #0004); }
+  .mascot { width:170px; height:auto; overflow:visible; filter:drop-shadow(0 8px 14px #0004); }
   .mascot .pupil { transition:transform .35s cubic-bezier(.3,1.6,.5,1) }
   .mascot .brow { transform-box:fill-box; transform-origin:center; transition:transform .35s }
   .mascot.idle .pupil { animation:look 6s ease-in-out infinite }
@@ -148,7 +150,7 @@
       <div class="cap"><span id="capName"></span><span id="capTime"></span></div>
     </div>
     <div class="talk">
-      <svg class="mascot idle blink" id="mascot" viewBox="0 0 200 130" aria-hidden="true">
+      <svg class="mascot idle blink" id="mascot" viewBox="0 -40 200 170" aria-hidden="true">
         <defs><clipPath id="clipL"><ellipse cx="60" cy="62" rx="34" ry="30"/></clipPath><clipPath id="clipR"><ellipse cx="140" cy="62" rx="34" ry="30"/></clipPath></defs>
         <ellipse cx="60" cy="62" rx="34" ry="30" fill="#fff"/><ellipse cx="140" cy="62" rx="34" ry="30" fill="#fff"/>
         <g class="pupil" id="pupL"><circle cx="60" cy="62" r="14" fill="#18181b"/><circle cx="55" cy="56" r="4.5" fill="#fff"/></g>
@@ -158,6 +160,7 @@
         <rect class="brow" id="browL" x="28" y="18" width="58" height="9" rx="4.5" fill="#18181b"/>
         <rect class="brow" id="browR" x="114" y="18" width="58" height="9" rx="4.5" fill="#18181b"/>
         <path id="mouth" d="M75 112 Q100 124 125 112" fill="none" stroke="#18181b" stroke-width="7" stroke-linecap="round"/>
+<path d="M42 8 C42 -22 70 -36 100 -36 C130 -36 158 -22 158 8 Z" fill="#0f172a"/><rect x="22" y="3" width="156" height="11" rx="5.5" fill="#0a0f1d"/><path d="M100 -27 l4.2 8.6 9.4 1.3 -6.8 6.6 1.6 9.4 -8.4 -4.4 -8.4 4.4 1.6 -9.4 -6.8 -6.6 9.4 -1.3Z" fill="#facc15"/>
       </svg>
       <div class="bubble" id="bubble"><p id="line"></p><div class="bmeta" id="lmeta"></div></div>
       <div class="hud">
