@@ -168,10 +168,10 @@ Want a heads-up? Turn on **Check for updates daily** in Settings: it runs a `git
 ## Commands
 
 ```text
-./onduty install | uninstall      install / remove the background service (starts at login)
+./onduty install | uninstall      install / remove the service (it runs only while a dashboard tab is open)
 ./onduty update                   pull the latest version and reinstall in place
 ./onduty start | stop | restart   control it
-./onduty open                     open the dashboard
+./onduty open                     start it (if needed) and open the dashboard
 ./onduty setup                    open Settings (the first-run wizard is at /setup)
 ./onduty recalibrate              recalibrate for this desk / monitors / camera
 ./onduty pause 60 | tomorrow | 0  pause for N minutes, until tomorrow, or resume
@@ -248,7 +248,7 @@ No. Frames are processed in memory, the dashboard only listens on `127.0.0.1`, a
 
 ## Under the hood
 
-Python 3.12 · [MediaPipe](https://ai.google.dev/edge/mediapipe) Face Landmarker · [Ultralytics](https://github.com/ultralytics/ultralytics) YOLO11n · macOS `say`, `ioreg` and CoreGraphics · a single-file dashboard and wizard in plain HTML/JS (no build step) · a LaunchAgent that starts it at login.
+Python 3.12 · [MediaPipe](https://ai.google.dev/edge/mediapipe) Face Landmarker · [Ultralytics](https://github.com/ultralytics/ultralytics) YOLO11n · macOS `say`, `ioreg` and CoreGraphics · a single-file dashboard and wizard in plain HTML/JS (no build step) · a LaunchAgent that starts it on demand.
 
 ## License
 

@@ -13,7 +13,6 @@ class MacOsal(unittest.TestCase):
         self.assertIsInstance(osal.system_asleep(), bool)
         self.assertGreaterEqual(osal.display_count(), 1)
         self.assertIsInstance(osal.mic_in_use(), bool)
-        self.assertIsInstance(osal.login_item_enabled(), bool)
         voices = osal.list_voices()
         self.assertTrue(all({"name", "locale"} <= v.keys() for v in voices))
 
@@ -21,8 +20,7 @@ class MacOsal(unittest.TestCase):
 class Contract(unittest.TestCase):
     """What every platform module must export (see CONTRIBUTING.md)."""
 
-    NAMES = ("idle_seconds", "system_asleep", "display_count", "mic_in_use", "list_voices", "speak", "notify", "play_alert",
-             "login_item_enabled", "set_login_item")
+    NAMES = ("idle_seconds", "system_asleep", "display_count", "mic_in_use", "list_voices", "speak", "notify", "play_alert")
 
     @unittest.skipUnless(sys.platform == "darwin", "needs a platform module")
     def test_all_functions_exported(self):

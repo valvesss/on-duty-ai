@@ -3,7 +3,6 @@
     import osal
     osal.idle_seconds() · osal.system_asleep() · osal.display_count() · osal.mic_in_use()
     osal.list_voices() · osal.speak(voice, rate, text) · osal.notify(title, message, sound) · osal.play_alert(volume)
-    osal.login_item_enabled() · osal.set_login_item(bool)
 
 macOS is implemented (osal_macos.py). To port to Linux or Windows, add osal_linux.py / osal_windows.py with the same
 functions (see CONTRIBUTING.md for what each one must do) and extend the dispatch below.

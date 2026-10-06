@@ -128,9 +128,6 @@ def cmd_install(_a) -> None:
 <plist version="1.0"><dict>
   <key>Label</key><string>{LABEL}</string>
   <key>ProgramArguments</key><array><string>/usr/bin/open</string><string>-W</string><string>{APP}</string></array>
-  <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><true/>
-  <key>ThrottleInterval</key><integer>5</integer>
 </dict></plist>
 """)
     legacy = PLIST.with_name("com.valvesss.onduty.plist")  # pre-0.3 label of the author's install
@@ -138,26 +135,11 @@ def cmd_install(_a) -> None:
         sh("launchctl", "bootout", f"gui/{UID}/com.valvesss.onduty", stderr=subprocess.DEVNULL)
         legacy.unlink()
     unload()
-    sh("launchctl", "enable", f"gui/{UID}/{LABEL}", stderr=subprocess.DEVNULL)  # undo a "don't start at login" from Settings
+    sh("launchctl", "enable", f"gui/{UID}/{LABEL}", stderr=subprocess.DEVNULL)  # undo a "don't start at login" from an older version
     sh("pkill", "-f", f"{DIR}/on_duty.py")  # bootout doesn't always take down the app `open` launched
     sh("launchctl", "bootstrap", f"gui/{UID}", str(PLIST), check=True)
-    cfg = config.load()
-    url = f"http://localhost:{cfg['port']}"
     print(f"installed. Allow Camera for OnDuty if macOS asks. Log: {LOG}")
-    for _ in range(40):  # the engine needs a few seconds to load its models
-        try:
-            urllib.request.urlopen(url + "/status", timeout=1)
-            break
-        except OSError:
-            time.sleep(1)
-    else:
-        sys.exit(f"the service didn't come up; see {LOG}")
-    if not getattr(_a, "updating", False):
-        sh("open", url + ("" if cfg["onboarded"] else "/setup"))
-    if not getattr(_a, "updating", False):
-        print(f"opened {url}{'' if cfg['onboarded'] else '/setup — finish the setup there'}")
-    else:
-        print(f"running at {url}")
+    cmd_start(_a)
 
 
 def cmd_update(_a) -> None:
@@ -179,15 +161,36 @@ def cmd_uninstall(_a) -> None:
     print("removed")
 
 
+def engine_up(port: int) -> bool:
+    try:
+        urllib.request.urlopen(f"http://localhost:{port}/status", timeout=1)
+        return True
+    except OSError:
+        return False
+
+
 def cmd_start(_a) -> None:
-    sh("launchctl", "bootstrap", f"gui/{UID}", str(PLIST), check=True)
-    print("started")
+    """The engine runs only while a dashboard tab is open: start it (it opens the tab itself) unless it's already up."""
+    port = config.load()["port"]
+    if engine_up(port):
+        sh("open", f"http://localhost:{port}")
+        print("already running, opened the dashboard")
+        return
+    if sh("launchctl", "print", f"gui/{UID}/{LABEL}", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
+        sh("launchctl", "bootstrap", f"gui/{UID}", str(PLIST), check=True)
+    sh("launchctl", "kickstart", f"gui/{UID}/{LABEL}", check=True)
+    for _ in range(60):  # the engine needs a few seconds to load its models
+        if engine_up(port):
+            print(f"running at http://localhost:{port}; it stops by itself when you close the last dashboard tab")
+            return
+        time.sleep(1)
+    sys.exit(f"the service didn't come up; see {LOG}")
 
 
 def cmd_stop(_a) -> None:
     unload()
     sh("pkill", "-f", f"{DIR}/on_duty.py")
-    print("stopped (back at next login; ./onduty start to resume now)")
+    print("stopped (./onduty start or ./onduty open to run it again)")
 
 
 def cmd_restart(a) -> None:
@@ -197,11 +200,14 @@ def cmd_restart(a) -> None:
 
 
 def cmd_open(_a) -> None:
-    sh("open", f"http://localhost:{config.load()['port']}")
+    cmd_start(_a)
 
 
 def cmd_recalibrate(_a) -> None:
-    sh("open", f"http://localhost:{config.load()['port']}/setup?calibrate")
+    port = config.load()["port"]
+    if not engine_up(port):
+        cmd_start(_a)
+    sh("open", f"http://localhost:{port}/setup?calibrate")
 
 
 def cmd_test(_a) -> None:
@@ -330,9 +336,9 @@ def cmd_phrases(a) -> None:
 def main() -> None:
     p = argparse.ArgumentParser(prog="onduty", description=__doc__)
     sub = p.add_subparsers(dest="cmd", required=True)
-    for name, fn, h in [("install", cmd_install, "install/update the service (starts at login)"),
-                        ("uninstall", cmd_uninstall, "remove the service"), ("start", cmd_start, "start now"),
-                        ("stop", cmd_stop, "stop until next login"), ("restart", cmd_restart, "stop + start"),
+    for name, fn, h in [("install", cmd_install, "install/update the service (runs only while a dashboard tab is open)"),
+                        ("uninstall", cmd_uninstall, "remove the service"), ("start", cmd_start, "start now (and open the dashboard)"),
+                        ("stop", cmd_stop, "stop now"), ("restart", cmd_restart, "stop + start"),
                         ("status", cmd_status, "is it running?"), ("logs", cmd_logs, "tail the log"),
                         ("stats", cmd_stats, "summary from the local database"), ("db", cmd_db, "SQL shell"),
                         ("doctor", cmd_doctor, "check the setup")]:

@@ -51,7 +51,6 @@ The contract (`tests/test_osal.py` checks that every name exists):
 | `speak(voice, rate, lines) -> Popen-like` | Speak the lines in order, return an object with `.poll()` and `.kill()` | `say` | `espeak-ng`/`spd-say`; PowerShell `System.Speech` |
 | `notify(title, message, subtitle, sound, url, thread)` | A desktop notification; clicking it should open `url` (the dashboard); `thread` groups related ones | a small Swift app, `~/Applications/on-duty.app` (`native/notify.swift`), so macOS shows on-duty's icon and name | `notify-send` (`--action`); Windows toast |
 | `play_alert(volume)` | Short attention sound | `afplay` | `paplay`; `winsound` |
-| `login_item_enabled()` / `set_login_item(bool)` | Start at login on/off, without stopping the running service | `launchctl enable/disable` | systemd `enable/disable`; Startup entry |
 
 Things in the engine that currently assume macOS and are fair game for a port: the LaunchAgent/`.app` bundle in
 `onduty.py`; the `[[slnc 600]]` pause marker (already inside `osal_macos.speak`); the install script (`install.sh`);

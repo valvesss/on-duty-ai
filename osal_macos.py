@@ -4,7 +4,6 @@ Everything here is stdlib + ctypes + the macOS command line tools; no pyobjc."""
 
 import ctypes
 import ctypes.util
-import re
 import subprocess
 from pathlib import Path
 
@@ -100,19 +99,3 @@ def notify(title: str, message: str, subtitle: str = "", sound: bool = False, ur
 
 def play_alert(volume: float) -> None:
     subprocess.Popen(["afplay", "-v", str(volume), "/System/Library/Sounds/Sosumi.aiff"])
-
-
-_LABEL = "com.onduty.service"
-
-
-def login_item_enabled() -> bool:
-    import os
-    out = subprocess.run(["launchctl", "print-disabled", f"gui/{os.getuid()}"], capture_output=True, text=True).stdout
-    m = re.search(rf'"{re.escape(_LABEL)}"\s*=>\s*(\w+)', out)
-    return not (m and m.group(1) in ("true", "disabled"))
-
-
-def set_login_item(enabled: bool) -> None:
-    """Start at login (or not). Does not start/stop the running service."""
-    import os
-    subprocess.run(["launchctl", "enable" if enabled else "disable", f"gui/{os.getuid()}/{_LABEL}"], capture_output=True)

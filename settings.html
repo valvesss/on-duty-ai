@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>on-duty · settings</title>
 <script src="/radar.js?v=3"></script>
+<script src="/presence.js"></script>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -78,7 +79,6 @@
   <section id="s-profile"><h2 id="h-profile"></h2><p class="lede" id="l-profile"></p>
     <div class="field"><label id="lb-name"></label><input type="text" id="name" maxlength="40" autocomplete="off"></div>
     <div class="field"><label id="lb-lang"></label><div class="seg" id="lang"><button data-v="pt_BR">🇧🇷 Português</button><button data-v="en_US">🇺🇸 English</button></div></div>
-    <div class="switch" id="login_item"><i></i><div><span id="t-login"></span><small id="t-login-s"></small></div></div>
   </section>
 
   <section id="s-tone"><h2 id="h-tone"></h2><p class="lede" id="l-tone"></p>
@@ -159,7 +159,7 @@ const $ = id => document.getElementById(id);
 const S = {
   en: {
     ttl:'Settings', back:'← Dashboard', saved:'Saved ✓', nav:{profile:'Profile',tone:'Humor & alerts',schedule:'Schedule',voice:'Voice',camera:'Camera & detection',calibration:'Calibration',phrases:'Phrases',data:'Data & privacy',about:'About'},
-    login:'Start at login', login_s:'on-duty starts by itself when you sign in to your Mac.', meet:'Stay quiet during calls', meet_s:'While an app is using your microphone I pause and free the camera.',
+    meet:'Stay quiet during calls', meet_s:'While an app is using your microphone I pause and free the camera.',
     upd:'Check for updates daily', upd_s:'Uses the network: a git fetch from GitHub. Off by default.', updnow:'Check now', upd_none:'Up to date.', upd_behind:n=>`${n} new change${n === 1 ? '' : 's'} available.`, upd_err:'Couldn’t check (offline?).', upd_unk:'Not checked yet.',
     h_profile:'Profile', l_profile:'Who I’m talking to, and in which language.', lb_name:'Name', lb_lang:'Language of the voice and lines',
     h_tone:'Humor & alerts', l_tone:'How hard I push. Tap a card to hear it.', notif:'Notifications', notif_s:'A macOS notification when I start and when I escalate.', sfx:'Alert sound', sfx_s:'The attention sound from level 3.',
@@ -182,7 +182,7 @@ const S = {
     h_about:'About', ab_ver:'Version', ab_port:'Port', ab_events:'Events', rerun:'Run the setup wizard again', aboutnote:'Uninstall: ./onduty uninstall, then delete the folder and ~/.on-duty.'},
   pt: {
     ttl:'Configurações', back:'← Painel', saved:'Salvo ✓', nav:{profile:'Perfil',tone:'Humor e alertas',schedule:'Horário',voice:'Voz',camera:'Câmera e detecção',calibration:'Calibração',phrases:'Frases',data:'Dados e privacidade',about:'Sobre'},
-    login:'Iniciar no login', login_s:'O on-duty liga sozinho quando você entra no Mac.', meet:'Ficar quieto em reuniões', meet_s:'Enquanto um app usa seu microfone eu pauso e libero a câmera.',
+    meet:'Ficar quieto em reuniões', meet_s:'Enquanto um app usa seu microfone eu pauso e libero a câmera.',
     upd:'Checar atualizações todo dia', upd_s:'Usa a rede: um git fetch do GitHub. Desligado por padrão.', updnow:'Checar agora', upd_none:'Atualizado.', upd_behind:n=>`${n} mudança${n === 1 ? '' : 's'} nova${n === 1 ? '' : 's'}.`, upd_err:'Não consegui checar (sem internet?).', upd_unk:'Ainda não checado.',
     h_profile:'Perfil', l_profile:'Com quem eu falo, e em que idioma.', lb_name:'Nome', lb_lang:'Idioma da voz e das frases',
     h_tone:'Humor e alertas', l_tone:'Quão pesado eu sou. Toque num cartão pra ouvir.', notif:'Notificações', notif_s:'Uma notificação do macOS quando eu começo e quando escalo.', sfx:'Som de alerta', sfx_s:'O som de atenção a partir do nível 3.',
@@ -220,7 +220,7 @@ function labels() {
   $('nav').innerHTML = SECTIONS.map(s => `<a href="#s-${s}" data-s="${s}">${ICONS[s]} ${T.nav[s]}<span class="dot"></span></a>`).join('');
   for (const s of SECTIONS) { if ($('h-' + s)) $('h-' + s).textContent = t('h_' + s); if ($('l-' + s)) $('l-' + s).textContent = t('l_' + s) || ''; }
   const set = (id, k) => { $(id).textContent = typeof t(k) === 'string' ? t(k) : ''; };
-  [['t-login','login'],['t-login-s','login_s'],['t-meet','meet'],['t-meet-s','meet_s'],['t-upd','upd'],['t-upd-s','upd_s'],['updnow','updnow'],['lb-name','lb_name'],['lb-lang','lb_lang'],['t-notif','notif'],['t-notif-s','notif_s'],['t-sfx','sfx'],['t-sfx-s','sfx_s'],['b-always','always'],['b-hours','hours'],['lb-days','lb_days'],['t-from','from'],['t-to','to'],['t-from2','from'],['t-to2','to'],['t-brk','brk'],
+  [['t-meet','meet'],['t-meet-s','meet_s'],['t-upd','upd'],['t-upd-s','upd_s'],['updnow','updnow'],['lb-name','lb_name'],['lb-lang','lb_lang'],['t-notif','notif'],['t-notif-s','notif_s'],['t-sfx','sfx'],['t-sfx-s','sfx_s'],['b-always','always'],['b-hours','hours'],['lb-days','lb_days'],['t-from','from'],['t-to','to'],['t-from2','from'],['t-to2','to'],['t-brk','brk'],
    ['t-voice-on','voice_on'],['vp','listen'],['lb-cam','lb_cam'],['swc','switch_cam'],['t-mirror','mirror'],['lb-rot','lb_rot'],['rot0','rot0'],['t-phone','phone'],['t-phone-s','phone_s'],['rtune','rtune'],['rcal','rcal'],['tunehint','tunehint'],
    ['lb-setups','lb_setups'],['setupsnote','setups_note'],['phrm','ph_rm'],['t-cpo','cpo'],['lb-ai','lb_ai'],['cpy','copy'],['lb-ret','lb_ret'],['exp','exp'],['clr','clr'],['rerun','rerun'],['aboutnote','aboutnote']].forEach(([i, k]) => set(i, k));
   $('aip').textContent = t('ai_prompt');
@@ -235,7 +235,6 @@ function render() {
   $('tones').querySelectorAll('[data-t]').forEach(async b => { const k = b.dataset.t, q = b.querySelector('q'); q.textContent = await sample(k);
     b.onclick = async () => { await save({tone:k}); $('tones').querySelectorAll('[data-t]').forEach(x => x.classList.toggle('on', x === b)); const tx = await sample(k); q.textContent = tx; say(cfg.voice, tx); }; });
   bindSwitch('pause_in_meetings', 'pause_in_meetings'); bindSwitch('update_check', 'update_check');
-  fetch('/api/login_item').then(r => r.json()).then(j => { $('login_item').classList.toggle('on', j.enabled); $('login_item').onclick = async () => { const on = !$('login_item').classList.contains('on'); $('login_item').classList.toggle('on', on); await api('/api/login_item', {enabled:on}); flash(); }; });
   $('updnow').onclick = async () => { await api('/api/update_check'); $('updstate').textContent = '…'; setTimeout(live, 4000); };
   bindSwitch('notifications', 'notifications'); bindSwitch('sound_effects', 'sound_effects');
   // schedule

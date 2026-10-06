@@ -19,6 +19,7 @@ import json
 import os
 import platform
 import random
+import signal
 import statistics
 import subprocess
 import sys
@@ -68,8 +69,9 @@ def log(msg: str) -> None:
         STATE["events"].appendleft(f"{dt.datetime.now():%H:%M:%S} {msg}")
 
 
-ASSETS = {"/radar.js": ("radar.js", "text/javascript"), "/logo.svg": ("logo.svg", "image/svg+xml"), "/favicon.svg": ("favicon.svg", "image/svg+xml"),
+ASSETS = {"/radar.js": ("radar.js", "text/javascript"), "/presence.js": ("presence.js", "text/javascript"), "/logo.svg": ("logo.svg", "image/svg+xml"), "/favicon.svg": ("favicon.svg", "image/svg+xml"),
           "/favicon.ico": ("favicon.ico", "image/x-icon"), "/apple-touch-icon.png": ("apple-touch-icon.png", "image/png")}
+PRESENCE = logic.TabPresence(time.time())  # restarted in main() once the models are loaded
 CFG: dict = {}  # live config; mutated in place by POST /api/config, picked up by the main loop
 HHMM = __import__("re").compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
@@ -301,8 +303,6 @@ class Dashboard(BaseHTTPRequestHandler):
             days = max(1, min(30, int(args.get("days", 7))))
             since = int(time.time()) - (days * 2 + 1) * 86400
             self._json(stats.summarize(db.events_since(since), db.focus_rows(since), time.time(), days))
-        elif path == "/api/login_item":
-            self._json({"enabled": osal.login_item_enabled()})
         elif path == "/summary":
             self._send((HERE / "summary.html").read_bytes(), "text/html; charset=utf-8")
         elif path == "/settings":
@@ -352,9 +352,8 @@ class Dashboard(BaseHTTPRequestHandler):
             STATE["reload"] = True
         elif self.path == "/api/focus":  # {"action": "start", "minutes": 25} | {"action": "stop"}
             STATE["cmds"].append({"action": "focus_" + str(body.get("action", "stop")), "minutes": body.get("minutes", 25)})
-        elif self.path == "/api/login_item":
-            osal.set_login_item(bool(body.get("enabled", True)))
-            return self._json({"enabled": osal.login_item_enabled()})
+        elif self.path in ("/api/ping", "/api/bye"):  # presence.js: the engine runs only while a tab is open
+            getattr(PRESENCE, "ping" if self.path == "/api/ping" else "bye")(str(body.get("tab", "?")), time.time())
         elif self.path == "/api/update_check":
             threading.Thread(target=check_updates, daemon=True).start()
         elif self.path == "/api/level":  # measure the camera tilt from your eye line (sit upright for 3 s)
@@ -511,7 +510,16 @@ SLEEP_POLL = {"asleep": 3, "paused": 5, "offduty": 15, "away": 1, "meeting": 3}
 BLANK = cv2.imencode(".jpg", np.zeros((360, 480, 3), np.uint8))[1].tobytes()
 
 
+def quit_without_tabs() -> None:
+    """No dashboard tab open = no on-duty: stop through the main loop's KeyboardInterrupt so the camera is released."""
+    while not PRESENCE.should_quit(time.time()):
+        time.sleep(2)
+    log("no dashboard tab open, stopping (./onduty open to start again)")
+    os.kill(os.getpid(), signal.SIGINT)
+
+
 def main() -> None:
+    global PRESENCE
     p = argparse.ArgumentParser(description="on-duty engine (normally started by the OnDuty.app service)")
     p.add_argument("--no-voice", action="store_true")
     p.add_argument("--fps", type=float, default=3.0)
@@ -564,6 +572,9 @@ def main() -> None:
     threading.Thread(target=update_loop, daemon=True).start()
     srv = ThreadingHTTPServer(("127.0.0.1", CFG["port"]), Dashboard)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
+    PRESENCE = logic.TabPresence(time.time())  # models are loaded: the first tab's grace starts now
+    threading.Thread(target=quit_without_tabs, daemon=True).start()
+    subprocess.Popen(["open", f"http://localhost:{CFG['port']}"])  # nothing runs without a tab, so every start opens one
     log(f"on-duty running · http://localhost:{CFG['port']}{'' if CFG['onboarded'] else '/setup'} · voice {nag.voice} · "
         f"phone detection {'on' if yolo else 'off'}")
 

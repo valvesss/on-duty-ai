@@ -53,6 +53,13 @@ class ApiTests(unittest.TestCase):
         code, _, data, _ = self.call(method, path, body)
         return code, json.loads(data)
 
+    def test_tab_presence_ping_and_bye(self):
+        on_duty.PRESENCE = on_duty.logic.TabPresence(0.0)
+        self.assertEqual(self.call("POST", "/api/ping", {"tab": "t1"})[0], 200)
+        self.assertIn("t1", on_duty.PRESENCE.tabs)
+        self.call("POST", "/api/bye", {"tab": "t1"})
+        self.assertNotIn("t1", on_duty.PRESENCE.tabs)
+
     def test_pages_are_served(self):
         for p in ("/", "/setup", "/settings", "/summary"):
             code, ctype, data, _ = self.call("GET", p)

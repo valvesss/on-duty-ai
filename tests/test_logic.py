@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from logic import Debounce, FocusSession  # noqa: E402
+from logic import Debounce, FocusSession, TabPresence  # noqa: E402
 
 
 class DebounceTests(unittest.TestCase):
@@ -46,3 +46,39 @@ class FocusTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TabPresenceTests(unittest.TestCase):
+    def test_waits_for_the_first_tab_then_quits(self):
+        p = TabPresence(0.0, boot_grace=90, grace=20)
+        self.assertFalse(p.should_quit(89.0))
+        self.assertTrue(p.should_quit(90.0))
+
+    def test_stays_while_a_tab_pings(self):
+        p = TabPresence(0.0)
+        for t in range(0, 600, 10):
+            p.ping("a", float(t))
+            self.assertFalse(p.should_quit(float(t)))
+
+    def test_quits_after_the_last_tab_says_bye(self):
+        p = TabPresence(0.0)
+        p.ping("a", 10.0), p.ping("b", 10.0)
+        p.bye("a", 20.0)
+        self.assertFalse(p.should_quit(100.0))  # b is still open
+        p.bye("b", 100.0)
+        self.assertFalse(p.should_quit(119.0))  # reload grace
+        self.assertTrue(p.should_quit(120.0))
+
+    def test_reload_survives(self):
+        p = TabPresence(0.0)
+        p.ping("a", 10.0)
+        p.bye("a", 50.0)
+        p.ping("a2", 52.0)
+        self.assertFalse(p.should_quit(100.0))
+
+    def test_silent_tabs_expire(self):
+        p = TabPresence(0.0, stale=150, grace=20)
+        p.ping("a", 10.0)
+        self.assertFalse(p.should_quit(159.0))
+        self.assertFalse(p.should_quit(160.0))  # expired here, grace starts
+        self.assertTrue(p.should_quit(180.0))
